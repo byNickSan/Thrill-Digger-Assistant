@@ -1,0 +1,2388 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14100c">
+<title>Thrill Digger Assistant — Zelda Skyward Sword helper / solver</title>
+<meta name="description" content="Helper / solver for Thrill Digger minigame in The Legend of Zelda: Skyward Sword (Tubert, Eldin Volcano). Computes bomb and rupoor probabilities per cell, ranks safest moves, logs games. Помощник для мини-игры из Zelda.">
+<meta name="keywords" content="thrill digger, thrill digger helper, thrill digger solver, thrill digger assistant, thrill digger calculator, thrill digger probability, zelda thrill digger, skyward sword thrill digger, skyward sword minigame, tubert minigame, tubert mogma, eldin volcano minigame, zelda minigame, zelda skyward sword, zelda ss, zelda rupee minigame, zelda bomb game, zelda minesweeper, rupee digging game, rupoor, rupoor calculator, dotekobori, 土こ堀り, トレジャー, excava-emoción, creusôtemps, wühlspiel, раскопки, копай-весельчак, тубер, мини-игра зельда, помощник зельда, солвер зельда, зельда раскопки">
+<meta name="author" content="Thrill Digger Assistant">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Thrill Digger Assistant">
+<meta property="og:description" content="Thrill Digger solver / helper for Zelda: Skyward Sword. Probabilities per cell, ranked safest moves, game log. Helps with Tubert's minigame on Eldin Volcano.">
+<meta property="og:locale" content="ru_RU">
+
+<!-- Twitter card -->
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Thrill Digger Assistant">
+<meta name="twitter:description" content="Solver и стратегический помощник для мини-игры из Zelda: Skyward Sword">
+
+<!-- SVG favicon (hexagonal rupee gem) -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='50,4 80,25 80,75 50,96 20,75 20,25' fill='%23e0b14a' stroke='%23000' stroke-width='4' stroke-linejoin='round'/><polygon points='50,4 80,25 50,40 20,25' fill='rgba(255,255,255,0.35)'/><polygon points='50,60 80,75 50,96 20,75' fill='rgba(0,0,0,0.25)'/></svg>">
+
+<!-- PWA manifest -->
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Thrill Digger">
+
+<style>
+  :root {
+    --bg: #14100c;
+    --bg-2: #221a13;
+    --panel: #2d2218;
+    --panel-2: #3a2c1f;
+    --tile: #6b4d35;
+    --tile-edge: #4a3322;
+    --tile-hover: #82603f;
+    --tile-revealed: #d9b97a;
+    --text: #f4ebd6;
+    --muted: #b6a487;
+    --gold: #e0b14a;
+    --gold-2: #b8861f;
+    --green: #5dbe6a;
+    --blue: #4e95e4;
+    --red: #e25151;
+    --silver: #d5d5d5;
+    --bomb: #1e1c1a;
+    --rupoor: #2a2538;
+    --safe: #59c569;
+    --danger: #e25151;
+    --warn: #e4a14e;
+    --shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+    --radius: 10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background:
+      radial-gradient(ellipse 1200px 700px at 20% 0%, rgba(80, 50, 22, 0.5) 0%, transparent 70%),
+      radial-gradient(ellipse 1000px 600px at 80% 30%, rgba(50, 70, 30, 0.3) 0%, transparent 60%),
+      radial-gradient(ellipse at top, #2a1f15 0%, var(--bg) 70%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      repeating-radial-gradient(circle at 0 0, transparent 0, transparent 80px, rgba(255, 220, 150, 0.02) 80px, rgba(255, 220, 150, 0.02) 81px);
+    z-index: -1;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 64px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  .rupee-counter {
+    display: flex;
+    align-items: center;
+    align-self: center;
+    padding: 5px 22px 5px 10px;
+    position: relative;
+    background:
+      radial-gradient(ellipse at top, #d9b07a 0%, #b48553 70%, #8a6334 100%);
+    border: 2px solid #2a1808;
+    border-radius: 18px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      inset 0 -3px 6px rgba(70, 35, 10, 0.45),
+      0 4px 8px rgba(0, 0, 0, 0.55);
+    font-family: "Trebuchet MS", "Lucida Grande", sans-serif;
+    min-width: 110px;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .rc-end {
+    position: absolute;
+    top: 50%;
+    width: 14px;
+    height: 22px;
+    background: #2a1808;
+    transform: translateY(-50%);
+    border-radius: 3px;
+    box-shadow: inset 0 0 0 1px rgba(255, 200, 130, 0.25);
+  }
+  .rc-end-left { left: -6px; }
+  .rc-end-right { right: -6px; }
+  .rc-icon {
+    position: relative;
+    width: 36px;
+    height: 26px;
+    flex-shrink: 0;
+  }
+  .rc-icon svg {
+    position: absolute;
+    width: 16px;
+    height: 18px;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
+  }
+  .rc-icon .rc-r { top: 0;  left: 10px; z-index: 1; }
+  .rc-icon .rc-b { top: 6px; left: 2px;  z-index: 2; }
+  .rc-icon .rc-g { top: 8px; right: 2px; z-index: 2; }
+  .rc-num {
+    font-size: 22px;
+    font-weight: 900;
+    color: #f4d24a;
+    text-shadow:
+      -1.2px -1.2px 0 #2a1808,
+       1.2px -1.2px 0 #2a1808,
+      -1.2px  1.2px 0 #2a1808,
+       1.2px  1.2px 0 #2a1808,
+       0 2px 2px rgba(0, 0, 0, 0.55);
+    letter-spacing: 1px;
+    line-height: 1;
+    font-style: italic;
+  }
+  .rc-num.dead { color: #e25151; }
+
+  h1 {
+    font-size: clamp(24px, 4vw, 38px);
+    color: var(--gold);
+    letter-spacing: 2px;
+    text-shadow:
+      0 2px 0 #5b3b13,
+      0 4px 8px rgba(0, 0, 0, 0.5),
+      0 0 18px rgba(224, 177, 74, 0.35);
+    font-weight: 700;
+    font-family: "Trebuchet MS", "Optima", "Lucida Bright", Georgia, serif;
+    font-style: italic;
+    display: inline-block;
+    padding: 0 30px;
+    position: relative;
+  }
+  h1::before, h1::after {
+    content: "❖";
+    color: var(--gold-2);
+    position: absolute;
+    top: 50%;
+    transform: translateY(-55%);
+    font-size: 0.6em;
+    opacity: 0.7;
+  }
+  h1::before { left: 0; }
+  h1::after { right: 0; }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 14px;
+    margin-top: 4px;
+    font-style: italic;
+    letter-spacing: 0.5px;
+  }
+
+  body.no-hints .advice,
+  body.no-hints .advice-tip { display: none; }
+  body.no-hints .board { border-color: rgba(120, 140, 90, 0.4); }
+
+  .training-badge {
+    display: none;
+    align-self: center;
+    padding: 4px 12px;
+    background: linear-gradient(180deg, rgba(80, 110, 60, 0.35), rgba(60, 90, 50, 0.2));
+    border: 1px solid rgba(140, 180, 100, 0.5);
+    border-radius: 16px;
+    color: #b8d098;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  body.no-hints .training-badge { display: inline-block; }
+
+  .calm-note {
+    color: var(--muted);
+    font-size: 12.5px;
+    margin: 12px auto 0;
+    max-width: 540px;
+    line-height: 1.55;
+    padding: 10px 16px;
+    background: linear-gradient(180deg, rgba(80, 100, 60, 0.12), rgba(60, 80, 50, 0.06));
+    border: 1px solid rgba(120, 140, 90, 0.25);
+    border-radius: 10px;
+    font-style: italic;
+  }
+
+  .lang-switch {
+    display: inline-flex;
+    margin-top: 14px;
+    gap: 2px;
+    background: var(--panel);
+    border: 1px solid #4a3422;
+    border-radius: 8px;
+    padding: 2px;
+  }
+  .lang-switch button {
+    background: transparent;
+    color: var(--muted);
+    border: none;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: all 0.15s;
+  }
+  .lang-switch button:hover { color: var(--text); }
+  .lang-switch button.active {
+    background: var(--gold);
+    color: #2a1f10;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 24px;
+    max-width: 1100px;
+    width: 100%;
+    align-items: start;
+  }
+
+  @media (max-width: 760px) {
+    body { padding: 12px 8px 48px; }
+    .layout { grid-template-columns: 1fr; gap: 14px; }
+    /* Board first on mobile, controls below */
+    .layout > .board-wrap { order: 1; }
+    .layout > aside { order: 2; }
+    h1 { font-size: 22px; }
+    .subtitle { font-size: 12px; }
+  }
+
+  @media (max-width: 540px) {
+    .board { padding: 8px; gap: 4px; border-radius: 10px; }
+    .cell {
+      width: calc((100vw - 24px - 4px * var(--gap-count) - 16px) / var(--cols));
+      min-width: 32px;
+      max-width: 72px;
+      border-width: 1.5px;
+      border-radius: 6px;
+    }
+    .cell .p-bomb { font-size: 12px; }
+    .cell .p-rupoor { font-size: 9px; }
+    .advice {
+      gap: 8px;
+      padding: 8px 10px;
+      min-width: unset;
+    }
+    .advice-item { min-width: 50px; }
+    .advice-item .label { font-size: 9px; letter-spacing: 0.8px; }
+    .advice-item .value { font-size: 14px; }
+    .advice-item .value#adv-bankvs,
+    .advice-item .value#adv-remaining { font-size: 11px !important; }
+    .advice-tip { font-size: 12px; padding: 6px 10px; }
+    .footer-note { font-size: 11px; line-height: 1.4; }
+    .panel { padding: 12px; }
+    .panel h2 { font-size: 11px; }
+    .stat .value { font-size: 16px; }
+    .picker { padding: 8px; width: 320px; }
+    .picker-grid { gap: 5px; }
+    .picker-btn { height: 64px; padding: 3px 1px 4px; }
+    .picker-btn svg { width: 36px; height: 36px; }
+    .picker-btn .value-label { font-size: 10px; }
+    .picker-btn .kbd { display: none; }
+    /* Beginner/Intermediate boards: wider cells on mobile */
+  }
+
+  @media (max-width: 380px) {
+    .cell { min-width: 28px; }
+    .advice-item { min-width: 44px; }
+    .advice-item .value { font-size: 13px; }
+  }
+
+  .panel {
+    background:
+      linear-gradient(180deg, var(--panel-2), var(--panel)),
+      radial-gradient(circle at 10% 0%, rgba(200, 150, 80, 0.06) 0%, transparent 50%);
+    border: 1px solid #4a3422;
+    border-radius: var(--radius);
+    padding: 18px;
+    box-shadow:
+      var(--shadow),
+      inset 0 1px 0 rgba(255, 220, 150, 0.08);
+    position: relative;
+  }
+  .panel::before, .panel::after {
+    content: "";
+    position: absolute;
+    width: 10px; height: 10px;
+    border: 1px solid var(--gold-2);
+    opacity: 0.5;
+  }
+  .panel::before {
+    top: 4px; left: 4px;
+    border-right: none; border-bottom: none;
+  }
+  .panel::after {
+    bottom: 4px; right: 4px;
+    border-left: none; border-top: none;
+  }
+
+  .panel h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1.6px;
+    color: var(--gold);
+    margin-bottom: 12px;
+    border-bottom: 1px solid #4a3422;
+    padding-bottom: 8px;
+    font-family: "Trebuchet MS", Georgia, serif;
+    font-style: italic;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+  }
+
+  .diff-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .diff-btn {
+    background: var(--tile);
+    color: var(--text);
+    border: 1px solid var(--tile-edge);
+    padding: 8px 4px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.15s;
+    position: relative;
+  }
+
+  .risk-tag {
+    position: absolute;
+    top: -8px;
+    right: 4px;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    background: var(--bg);
+    border: 1px solid currentColor;
+    line-height: 1;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  }
+  .risk-low { color: var(--safe); }
+  .risk-med { color: var(--warn); }
+  .risk-hi  { color: var(--danger); }
+
+  .log-select {
+    width: 100%;
+    margin-top: 10px;
+    background: var(--bg-2);
+    color: var(--text);
+    border: 1px solid #3a2c1f;
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .log-map {
+    display: none;
+    gap: 2px;
+    padding: 6px;
+    background: var(--bg-2);
+    border: 1px solid #3a2c1f;
+    border-radius: 6px;
+    margin-top: 8px;
+  }
+  .log-map.show { display: grid; }
+  .mini-cell {
+    aspect-ratio: 1;
+    background: var(--tile);
+    border: 1px solid var(--tile-edge);
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 14px;
+    position: relative;
+  }
+  .mini-cell.filled { background: linear-gradient(180deg, #d9b97a, #a08047); }
+  .mini-cell svg { width: 80%; height: 80%; }
+  .mini-cell.bomb-cell { background: linear-gradient(180deg, #4a1a1a, #1a0a0a); border-color: #e25151; }
+
+  .diff-btn:hover { background: var(--tile-hover); }
+  .diff-btn.active {
+    background: var(--gold);
+    color: #2a1f10;
+    border-color: var(--gold-2);
+  }
+
+  .action-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .btn {
+    flex: 1;
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid #4a3422;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s;
+  }
+
+  .btn:hover { background: var(--tile); }
+  .btn.primary {
+    background: var(--gold);
+    color: #2a1f10;
+    border-color: var(--gold-2);
+    font-weight: 600;
+  }
+  .btn.primary:hover { background: #f0c25c; }
+
+
+  .toggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .switch {
+    position: relative;
+    width: 38px;
+    height: 20px;
+    background: #4a3322;
+    border-radius: 20px;
+    transition: background 0.2s;
+  }
+
+  .switch::after {
+    content: "";
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    background: var(--text);
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+
+  .toggle.on .switch { background: var(--gold); }
+  .toggle.on .switch::after { transform: translateX(18px); background: #2a1f10; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .stat {
+    background: var(--bg-2);
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #3a2c1f;
+  }
+
+  .stat .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .stat .value { font-size: 20px; font-weight: 700; color: var(--gold); margin-top: 2px; }
+
+  .legend { font-size: 12px; color: var(--muted); }
+  .legend-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0;
+  }
+  .legend-row svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+  /* Board */
+  .board-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .board {
+    display: grid;
+    gap: 6px;
+    padding: 16px;
+    background:
+      radial-gradient(ellipse at center, #3a2a1a 0%, #1d150e 80%),
+      linear-gradient(180deg, #2d2218, #1d150e);
+    border: 2px solid var(--gold-2);
+    border-radius: 14px;
+    box-shadow:
+      var(--shadow),
+      inset 0 0 30px rgba(0, 0, 0, 0.6),
+      inset 0 2px 0 rgba(255, 220, 150, 0.1);
+    position: relative;
+  }
+  .board::before, .board::after {
+    content: "";
+    position: absolute;
+    width: 18px; height: 18px;
+    border: 2px solid var(--gold);
+    opacity: 0.7;
+  }
+  .board::before {
+    top: -2px; left: -2px;
+    border-right: none; border-bottom: none;
+    border-top-left-radius: 14px;
+  }
+  .board::after {
+    bottom: -2px; right: -2px;
+    border-left: none; border-top: none;
+    border-bottom-right-radius: 14px;
+  }
+
+  .cell {
+    width: clamp(48px, 6vw, 92px);
+    aspect-ratio: 1;
+    background: linear-gradient(180deg, var(--tile), #4f3725);
+    border: 2px solid var(--tile-edge);
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: transform 0.1s, background 0.15s, box-shadow 0.15s;
+    user-select: none;
+  }
+
+  .cell:hover { filter: brightness(1.18); transform: translateY(-1px); }
+  .cell:active { transform: translateY(0); }
+
+  @media (hover: none) {
+    .cell:hover { filter: none; transform: none; }
+  }
+
+  .cell.revealed {
+    background: linear-gradient(180deg, #e8c889, #b6924f);
+    border-color: #7a5826;
+    cursor: pointer;
+  }
+
+  .cell svg.icon {
+    width: 78%;
+    height: 78%;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
+  }
+
+  .cell .prob-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.05;
+    pointer-events: none;
+  }
+  .cell .p-bomb {
+    font-size: clamp(15px, 2.2vw, 22px);
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    letter-spacing: -0.5px;
+  }
+  .cell .p-rupoor {
+    font-size: clamp(10px, 1.4vw, 14px);
+    font-weight: 700;
+    color: rgba(225, 205, 245, 0.95);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.7);
+    margin-top: 1px;
+  }
+  .cell .p-rupoor::before { content: "−"; opacity: 0.7; margin-right: 1px; }
+  .cell .p-unknown {
+    font-size: clamp(18px, 2.6vw, 26px);
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.65);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    line-height: 1;
+  }
+  .cell .p-dim {
+    font-size: clamp(9px, 1.3vw, 13px);
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.42);
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+    margin-top: 2px;
+    line-height: 1;
+  }
+
+  .cell.safe {
+    box-shadow: 0 0 0 2px var(--safe), 0 0 14px rgba(89, 197, 105, 0.6);
+    animation: safe-glow 2s ease-in-out infinite;
+  }
+  @keyframes safe-glow {
+    0%, 100% { box-shadow: 0 0 0 2px var(--safe), 0 0 12px rgba(89, 197, 105, 0.5); }
+    50%      { box-shadow: 0 0 0 2px var(--safe), 0 0 22px rgba(89, 197, 105, 0.9); }
+  }
+  .cell.danger { box-shadow: 0 0 0 2px #fff, 0 0 14px rgba(226, 81, 81, 0.7); }
+  .cell.forced {
+    box-shadow: 0 0 0 2px #ff4444, 0 0 16px rgba(255, 68, 68, 0.8);
+    animation: forced-pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes forced-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px #ff4444, 0 0 12px rgba(255, 68, 68, 0.55); }
+    50%      { box-shadow: 0 0 0 2px #ff4444, 0 0 22px rgba(255, 68, 68, 1); }
+  }
+
+  .cell .forced-mark {
+    display: inline-block;
+    width: 0.9em; height: 0.9em;
+    vertical-align: middle;
+    margin-right: 2px;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.7));
+  }
+
+  /* Hover constraint visualization */
+  .cell.constrained {
+    outline: 2px dashed rgba(224, 177, 74, 0.85);
+    outline-offset: -3px;
+    z-index: 1;
+  }
+  .cell.constraint-source {
+    box-shadow: 0 0 0 3px var(--gold), 0 0 16px rgba(224, 177, 74, 0.7);
+    z-index: 2;
+  }
+
+  .cell.suggested-1 {
+    outline: 3px solid var(--gold);
+    outline-offset: -3px;
+    z-index: 2;
+    box-shadow: 0 0 14px rgba(224, 177, 74, 0.6);
+  }
+  .cell.suggested-2 {
+    outline: 2px solid var(--gold);
+    outline-offset: -3px;
+    z-index: 1;
+    opacity: 0.95;
+  }
+  .cell.suggested-3 {
+    outline: 1px dashed rgba(224, 177, 74, 0.85);
+    outline-offset: -3px;
+    z-index: 1;
+    opacity: 0.85;
+  }
+  .cell .rank-badge {
+    position: absolute;
+    top: 1px;
+    left: 3px;
+    font-size: clamp(9px, 1.2vw, 12px);
+    font-weight: 900;
+    color: var(--gold);
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 3px;
+    padding: 0 3px;
+    line-height: 1.1;
+    pointer-events: none;
+  }
+
+
+  .advice {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid #4a3422;
+    border-radius: 12px;
+    padding: 12px 18px;
+    flex-wrap: wrap;
+    box-shadow: var(--shadow);
+    min-width: 280px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .advice-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 64px;
+  }
+  .advice-item .label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--muted);
+  }
+  .advice-item .value {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--text);
+    margin-top: 2px;
+  }
+  .advice-item .value.ev-pos { color: var(--safe); }
+  .advice-item .value.ev-neg { color: var(--danger); }
+  .advice-item .value.bomb-low { color: var(--safe); }
+  .advice-item .value.bomb-mid { color: var(--warn); }
+  .advice-item .value.bomb-hi  { color: var(--danger); }
+
+  .advice.game-over {
+    border-color: #555;
+    background: linear-gradient(180deg, #1a1612, #0f0a07);
+    color: var(--muted);
+  }
+  .advice.game-over .advice-item .value { color: var(--muted); }
+
+  .advice-tip {
+    margin-top: 8px;
+    padding: 8px 14px;
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--gold-2);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 13px;
+    text-align: center;
+    box-shadow: var(--shadow);
+    display: none;
+    max-width: 540px;
+  }
+  .advice-tip.show { display: block; }
+
+  /* Picker */
+  .picker-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10;
+    display: none;
+  }
+
+  .picker-backdrop.show { display: block; }
+
+  .picker {
+    position: fixed;
+    background: var(--panel);
+    border: 1px solid #5a4332;
+    border-radius: 12px;
+    padding: 12px;
+    z-index: 11;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+    display: none;
+    width: 380px;
+    max-width: 95vw;
+  }
+
+  .picker.show { display: block; }
+
+  .picker-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+  }
+  .picker-row-2 {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+
+  .picker-btn {
+    width: 100%;
+    height: 80px;
+    background: var(--tile);
+    border: 2px solid var(--tile-edge);
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    transition: all 0.12s;
+    position: relative;
+    padding: 4px 2px 6px;
+  }
+
+  .picker-btn:hover { background: var(--tile-hover); transform: scale(1.05); }
+  .picker-btn.active { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold-2); }
+
+  .picker-btn svg { width: 46px; height: 46px; }
+
+  .picker-btn.clear {
+    background: var(--bg-2);
+    color: var(--muted);
+    font-size: 22px;
+    font-weight: 700;
+  }
+  .picker-btn.clear .value-label { color: var(--muted); }
+
+  .picker-btn .kbd {
+    position: absolute;
+    top: 3px; left: 5px;
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 700;
+    opacity: 0.7;
+  }
+  .picker-btn .value-label {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: 0.3px;
+    line-height: 1;
+  }
+
+  .picker-hint {
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #4a3422;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--panel);
+    border: 1px solid var(--gold-2);
+    color: var(--text);
+    padding: 10px 16px;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    z-index: 20;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+    font-size: 13px;
+  }
+  .toast.show { opacity: 1; }
+
+  .footer-note {
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+    margin-top: 24px;
+    max-width: 600px;
+    line-height: 1.5;
+  }
+
+  /* SVG defs (icons embed colors) */
+</style>
+</head>
+<body>
+
+<!-- Reusable SVG icons (defined once via <defs>) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- Hexagonal faceted rupee gem (vertical hexagon) -->
+    <symbol id="rupee" viewBox="0 0 100 100">
+      <polygon points="50,4 80,25 80,75 50,96 20,75 20,25"
+        stroke="rgba(0,0,0,0.7)" stroke-width="3" stroke-linejoin="round"/>
+      <!-- Top facet (highlight) -->
+      <polygon points="50,4 80,25 50,40 20,25" fill="rgba(255,255,255,0.32)"/>
+      <!-- Left facet -->
+      <polygon points="20,25 50,40 50,60 20,75" fill="rgba(255,255,255,0.10)"/>
+      <!-- Right facet -->
+      <polygon points="80,25 50,40 50,60 80,75" fill="rgba(0,0,0,0.15)"/>
+      <!-- Bottom facet (shadow) -->
+      <polygon points="50,60 80,75 50,96 20,75" fill="rgba(0,0,0,0.30)"/>
+    </symbol>
+    <!-- Bomb -->
+    <symbol id="bomb" viewBox="0 0 100 100">
+      <circle cx="50" cy="60" r="34" fill="#1a1a1a" stroke="#000" stroke-width="3"/>
+      <circle cx="38" cy="50" r="6" fill="#5a5a5a"/>
+      <rect x="46" y="18" width="8" height="16" fill="#3a2f1f"/>
+      <path d="M50 18 Q 60 8, 70 14 Q 64 20, 56 16" fill="#f0a040"/>
+      <circle cx="68" cy="14" r="4" fill="#ffcc44"/>
+    </symbol>
+    <!-- Rupoor (dark hexagonal gem, no cross) -->
+    <symbol id="rupoor" viewBox="0 0 100 100">
+      <polygon points="50,4 80,25 80,75 50,96 20,75 20,25"
+        fill="#1a1422" stroke="#000" stroke-width="3" stroke-linejoin="round"/>
+      <polygon points="50,4 80,25 50,40 20,25" fill="rgba(255,255,255,0.14)"/>
+      <polygon points="20,25 50,40 50,60 20,75" fill="rgba(255,255,255,0.05)"/>
+      <polygon points="80,25 50,40 50,60 80,75" fill="rgba(0,0,0,0.30)"/>
+      <polygon points="50,60 80,75 50,96 20,75" fill="rgba(0,0,0,0.55)"/>
+    </symbol>
+  </defs>
+</svg>
+
+<header>
+  <h1>⬡ Thrill Digger Assistant</h1>
+  <div class="subtitle" data-i18n="subtitle">Помощник для мини-игры из Zelda: Skyward Sword</div>
+  <div class="calm-note" data-i18n="calmNote">🍃 Не злись на бомбы — это математически оптимальная стратегия. Дисперсия — часть игры. Попробуй ещё, успех не заставит ждать.</div>
+</header>
+
+<div class="layout">
+  <!-- LEFT PANEL -->
+  <aside>
+    <div class="panel">
+      <h2 data-i18n="difficulty">Сложность</h2>
+      <div class="diff-row">
+        <button class="diff-btn" data-diff="beginner">Beginner<span class="risk-tag risk-low">low&nbsp;20%</span></button>
+        <button class="diff-btn" data-diff="intermediate">Intermed.<span class="risk-tag risk-med">med&nbsp;27%</span></button>
+        <button class="diff-btn" data-diff="expert">Expert<span class="risk-tag risk-hi">high&nbsp;40%</span></button>
+      </div>
+
+      <h2 data-i18n="controls">Управление</h2>
+      <div class="action-row">
+        <button class="btn primary" id="reset-btn" data-i18n="reset">Сбросить</button>
+      </div>
+      <div class="toggle on" id="hints-toggle">
+        <span data-i18n="solverHints">Подсказки солвера</span>
+        <span class="switch"></span>
+      </div>
+
+      <h2 style="margin-top:14px" data-i18n="stats">Статистика</h2>
+      <div class="stats">
+        <div class="stat">
+          <div class="label" data-i18n="score">Счёт</div>
+          <div class="value" id="score-val">0</div>
+        </div>
+        <div class="stat">
+          <div class="label" data-i18n="opened">Открыто</div>
+          <div class="value" id="opened-val">0</div>
+        </div>
+        <div class="stat">
+          <div class="label" data-i18n="hazards">Опасностей</div>
+          <div class="value" id="hazards-val">0/0</div>
+        </div>
+        <div class="stat">
+          <div class="label" data-i18n="safeCount">Безопасных</div>
+          <div class="value" id="safe-val" style="color:var(--safe)">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <h2 data-i18n="gameLog">Лог игр</h2>
+      <div class="stats" style="grid-template-columns: 1fr 1fr;">
+        <div class="stat">
+          <div class="label" data-i18n="played">Сыграно</div>
+          <div class="value" id="games-count">0</div>
+        </div>
+        <div class="stat">
+          <div class="label" data-i18n="best">Лучший</div>
+          <div class="value" id="best-score">—</div>
+        </div>
+      </div>
+      <div class="action-row" style="margin-top:10px">
+        <button class="btn primary" id="copy-log-btn" data-i18n="copy">📋 Копи</button>
+        <button class="btn" id="paste-log-btn" data-i18n="paste">📥 Вставить</button>
+        <button class="btn" id="clear-log-btn" data-i18n-title="clearLog" title="Очистить лог">🗑</button>
+      </div>
+      <select id="log-select" class="log-select">
+        <option value="" data-i18n="selectGame">— выбери партию —</option>
+      </select>
+      <div id="log-map" class="log-map"></div>
+      <textarea id="log-area" readonly aria-hidden="true"
+        style="position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none"></textarea>
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <h2 data-i18n="legend">Легенда</h2>
+      <div class="legend">
+        <div class="legend-row"><svg><use href="#rupee" style="fill:var(--green)"/></svg><span data-i18n="legendGreen">Зелёный — 0 угроз рядом</span></div>
+        <div class="legend-row"><svg><use href="#rupee" style="fill:var(--blue)"/></svg><span data-i18n="legendBlue">Синий — 1–2 угрозы</span></div>
+        <div class="legend-row"><svg><use href="#rupee" style="fill:var(--red)"/></svg><span data-i18n="legendRed">Красный — 3–4</span></div>
+        <div class="legend-row"><svg><use href="#rupee" style="fill:var(--silver)"/></svg><span data-i18n="legendSilver">Серебряный — 5–6</span></div>
+        <div class="legend-row"><svg><use href="#rupee" style="fill:var(--gold)"/></svg><span data-i18n="legendGold">Золотой — 7–8</span></div>
+        <div class="legend-row"><svg><use href="#bomb"/></svg><span data-i18n="legendBomb">Бомба — конец игры</span></div>
+        <div class="legend-row"><svg><use href="#rupoor"/></svg><span data-i18n="legendRupoor">Rupoor — штраф</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- BOARD -->
+  <div class="board-wrap">
+    <div class="training-badge" data-i18n="trainingOn">🎮 Тренировка — без подсказок</div>
+    <div class="rupee-counter" id="rupee-counter">
+      <span class="rc-end rc-end-left"></span>
+      <span class="rc-icon">
+        <svg class="rc-r" viewBox="0 0 100 100"><use href="#rupee" style="fill:#e25151"/></svg>
+        <svg class="rc-b" viewBox="0 0 100 100"><use href="#rupee" style="fill:#4e95e4"/></svg>
+        <svg class="rc-g" viewBox="0 0 100 100"><use href="#rupee" style="fill:#5dbe6a"/></svg>
+      </span>
+      <span class="rc-num" id="rc-num">0</span>
+      <span class="rc-end rc-end-right"></span>
+    </div>
+    <div class="advice" id="advice">
+      <div class="advice-item">
+        <div class="label" data-i18n="advEv">EV кандидата</div>
+        <div class="value" id="adv-ev">—</div>
+      </div>
+      <div class="advice-item">
+        <div class="label" data-i18n="advBomb">мин 💣</div>
+        <div class="value" id="adv-bomb">—</div>
+      </div>
+      <div class="advice-item">
+        <div class="label" data-i18n="advRupoor">мин ✕</div>
+        <div class="value" id="adv-rupoor">—</div>
+      </div>
+      <div class="advice-item">
+        <div class="label" data-i18n="advSafe">мин Safe</div>
+        <div class="value" id="adv-safe">—</div>
+      </div>
+      <div class="advice-item">
+        <div class="label" data-i18n="advDensity">Плотность</div>
+        <div class="value" id="adv-density">—</div>
+      </div>
+      <div class="advice-item">
+        <div class="label" data-i18n="advRemaining">Остаток</div>
+        <div class="value" id="adv-remaining" style="font-size:14px">—</div>
+      </div>
+      <div class="advice-item bank-vs">
+        <div class="label" data-i18n="advBankVs">Bank vs Risk</div>
+        <div class="value" id="adv-bankvs" style="font-size:13px">—</div>
+      </div>
+    </div>
+    <div class="advice-tip" id="advice-tip"></div>
+    <div class="board" id="board"></div>
+    <div class="footer-note">
+      <span data-i18n="footerHelp">Кликни на ячейку → выбери рупию, которую достал. Солвер пересчитывает вероятности после каждого хода. Горячие клавиши: 1–5 для рупий, B / R для бомбы и rupoor, 0 — очистить.</span>
+      <br><br>
+      <span style="opacity:0.6;font-size:11px" data-i18n="disclaimer">
+        Неофициальный фанатский помощник. Не аффилирован с Nintendo. The Legend of Zelda и Skyward Sword — товарные знаки Nintendo.
+      </span>
+      <br>
+      <div class="lang-switch" id="lang-switch">
+        <button data-lang="ru">RU</button>
+        <button data-lang="en">EN</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Picker -->
+<div class="picker-backdrop" id="picker-backdrop"></div>
+<div class="picker" id="picker">
+  <div class="picker-grid">
+    <button class="picker-btn" data-val="green" title="Зелёный (1)">
+      <span class="kbd">1</span>
+      <svg><use href="#rupee" style="fill:var(--green)"/></svg>
+      <span class="value-label">+1</span>
+    </button>
+    <button class="picker-btn" data-val="blue" title="Синий (2)">
+      <span class="kbd">2</span>
+      <svg><use href="#rupee" style="fill:var(--blue)"/></svg>
+      <span class="value-label">+5</span>
+    </button>
+    <button class="picker-btn" data-val="red" title="Красный (3)">
+      <span class="kbd">3</span>
+      <svg><use href="#rupee" style="fill:var(--red)"/></svg>
+      <span class="value-label">+20</span>
+    </button>
+    <button class="picker-btn" data-val="silver" title="Серебряный (4)">
+      <span class="kbd">4</span>
+      <svg><use href="#rupee" style="fill:var(--silver)"/></svg>
+      <span class="value-label">+100</span>
+    </button>
+    <button class="picker-btn" data-val="gold" title="Золотой (5)">
+      <span class="kbd">5</span>
+      <svg><use href="#rupee" style="fill:var(--gold)"/></svg>
+      <span class="value-label">+300</span>
+    </button>
+  </div>
+  <div class="picker-row-2">
+    <button class="picker-btn" data-val="bomb" title="Бомба (B)">
+      <span class="kbd">B</span>
+      <svg><use href="#bomb"/></svg>
+      <span class="value-label">💀</span>
+    </button>
+    <button class="picker-btn" data-val="rupoor" title="Rupoor (R)">
+      <span class="kbd">R</span>
+      <svg><use href="#rupoor"/></svg>
+      <span class="value-label">−10</span>
+    </button>
+    <button class="picker-btn clear" data-val="clear" title="Очистить (0)">
+      <span class="kbd">0</span>
+      ✕
+      <span class="value-label">clear</span>
+    </button>
+  </div>
+  <div class="picker-hint">Выбери, что выкопал — солвер пересчитает.</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+//=============================================================
+// CONSTANTS
+//=============================================================
+const I18N = {
+  ru: {
+    subtitle: 'Помощник для мини-игры из Zelda: Skyward Sword',
+    calmNote: '🍃 Не злись на бомбы — это математически оптимальная стратегия, случайность всегда даёт о себе знать. Попробуй ещё раз, успех не заставит ждать.',
+    difficulty: 'Сложность',
+    controls: 'Управление',
+    reset: 'Сбросить',
+    solverHints: 'Подсказки солвера',
+    stats: 'Статистика',
+    score: 'Счёт',
+    opened: 'Открыто',
+    hazards: 'Опасностей',
+    safeCount: 'Безопасных',
+    gameLog: 'Лог игр',
+    played: 'Сыграно',
+    best: 'Лучший',
+    copy: '📋 Копи',
+    paste: '📥 Вставить',
+    clearLog: 'Очистить лог',
+    selectGame: '— выбери партию —',
+    legend: 'Легенда',
+    legendGreen: 'Зелёный — 0 угроз рядом',
+    legendBlue: 'Синий — 1–2 угрозы',
+    legendRed: 'Красный — 3–4',
+    legendSilver: 'Серебряный — 5–6',
+    legendGold: 'Золотой — 7–8',
+    legendBomb: 'Бомба — конец игры',
+    legendRupoor: 'Rupoor — штраф',
+    advEv: 'EV кандидата',
+    advBomb: 'мин 💣',
+    advRupoor: 'мин ✕',
+    advSafe: 'мин Safe',
+    advDensity: 'Плотность',
+    advRemaining: 'Остаток',
+    advBankVs: 'Bank vs Risk',
+    footerHelp: 'Кликни на ячейку → выбери рупию, которую достал. Солвер пересчитывает вероятности после каждого хода. Горячие клавиши: 1–5 для рупий, B / R для бомбы и rupoor, 0 — очистить.',
+    disclaimer: 'Неофициальный фанатский помощник. Не аффилирован с Nintendo. The Legend of Zelda и Skyward Sword — товарные знаки Nintendo.',
+    trainingOn: '🎮 Тренировка — без подсказок'
+  },
+  en: {
+    subtitle: 'Helper for the Thrill Digger minigame in Zelda: Skyward Sword',
+    calmNote: '🍃 Don\'t get mad about bombs — this is the mathematically optimal strategy. Variance is part of the game. Try again, success will follow.',
+    difficulty: 'Difficulty',
+    controls: 'Controls',
+    reset: 'Reset',
+    solverHints: 'Solver hints',
+    stats: 'Stats',
+    score: 'Score',
+    opened: 'Opened',
+    hazards: 'Hazards',
+    safeCount: 'Safe',
+    gameLog: 'Game log',
+    played: 'Played',
+    best: 'Best',
+    copy: '📋 Copy',
+    paste: '📥 Paste',
+    clearLog: 'Clear log',
+    selectGame: '— pick a game —',
+    legend: 'Legend',
+    legendGreen: 'Green — 0 hazards nearby',
+    legendBlue: 'Blue — 1–2 hazards',
+    legendRed: 'Red — 3–4',
+    legendSilver: 'Silver — 5–6',
+    legendGold: 'Gold — 7–8',
+    legendBomb: 'Bomb — game over',
+    legendRupoor: 'Rupoor — penalty',
+    advEv: 'EV',
+    advBomb: 'min 💣',
+    advRupoor: 'min ✕',
+    advSafe: 'min Safe',
+    advDensity: 'Density',
+    advRemaining: 'Left',
+    advBankVs: 'Bank vs Risk',
+    footerHelp: 'Click a cell → pick what you dug up. Solver recomputes probabilities each move. Hotkeys: 1–5 for rupees, B / R for bomb and rupoor, 0 — clear.',
+    disclaimer: 'Unofficial fan tool. Not affiliated with Nintendo. The Legend of Zelda and Skyward Sword are trademarks of Nintendo.',
+    trainingOn: '🎮 Training mode — no hints'
+  }
+};
+
+const LANG_KEY = 'thrillDiggerLang';
+let currentLang = 'ru';
+
+function detectLang() {
+  try {
+    const stored = localStorage.getItem(LANG_KEY);
+    if (stored && I18N[stored]) return stored;
+  } catch {}
+  const nav = (navigator.language || 'en').toLowerCase();
+  return nav.startsWith('ru') ? 'ru' : 'en';
+}
+
+function applyLang(lang) {
+  if (!I18N[lang]) lang = 'en';
+  currentLang = lang;
+  try { localStorage.setItem(LANG_KEY, lang); } catch {}
+  document.documentElement.lang = lang;
+  const dict = I18N[lang];
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const k = el.getAttribute('data-i18n');
+    if (dict[k] != null) el.textContent = dict[k];
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const k = el.getAttribute('data-i18n-title');
+    if (dict[k] != null) el.title = dict[k];
+  });
+  document.querySelectorAll('.lang-switch button').forEach(b => {
+    b.classList.toggle('active', b.dataset.lang === lang);
+  });
+}
+
+const DIFFICULTIES = {
+  beginner:     { rows: 4, cols: 5, bombs: 4, rupoors: 0, penalty: -30 },
+  intermediate: { rows: 5, cols: 6, bombs: 4, rupoors: 4, penalty: -50 },
+  expert:       { rows: 5, cols: 8, bombs: 8, rupoors: 8, penalty: -70 }
+};
+
+const RUPEES = {
+  green:  { range: [0, 0], value: 1,   color: 'var(--green)'  },
+  blue:   { range: [1, 2], value: 5,   color: 'var(--blue)'   },
+  red:    { range: [3, 4], value: 20,  color: 'var(--red)'    },
+  silver: { range: [5, 6], value: 100, color: 'var(--silver)' },
+  gold:   { range: [7, 8], value: 300, color: 'var(--gold)'   }
+};
+const HAZARDS = new Set(['bomb', 'rupoor']);
+
+// Default average rupee value (fallback when no history)
+const AVG_RUPEE_DEFAULT = { beginner: 6, intermediate: 12, expert: 22 };
+
+// Compute adaptive avg rupee value from past games for this difficulty
+function getAvgRupee() {
+  const log = loadLog();
+  const sameDiff = log.filter(g => g.difficulty === state.difficulty);
+  let totalValue = 0, totalSafe = 0;
+  for (const g of sameDiff) {
+    for (const m of g.moves) {
+      if (m.v === 'bomb' || m.v === 'rupoor') continue;
+      const val = (RUPEES[m.v] && RUPEES[m.v].value) || 0;
+      totalValue += val;
+      totalSafe++;
+    }
+  }
+  if (totalSafe < 5) return AVG_RUPEE_DEFAULT[state.difficulty];
+  return totalValue / totalSafe;
+}
+
+
+const KEY_MAP = {
+  '1': 'green', '2': 'blue', '3': 'red', '4': 'silver', '5': 'gold',
+  'b': 'bomb', 'B': 'bomb', 'r': 'rupoor', 'R': 'rupoor',
+  '0': 'clear', 'Delete': 'clear', 'Backspace': 'clear'
+};
+
+//=============================================================
+// STATE
+//=============================================================
+const state = {
+  difficulty: 'beginner',
+  board: [],              // 2D array: null | rupee key | 'bomb' | 'rupoor'
+  picker: null,           // {r, c} or null
+  showHints: true,
+  probs: {},              // "r,c" -> probability of hazard
+  moves: [],              // current game moves: [{r, c, val, t}]
+  gameStart: null         // timestamp when first move was made
+};
+
+const LOG_KEY = 'thrillDiggerLog';
+const CURRENT_KEY = 'thrillDiggerCurrent';
+
+function loadLog() {
+  try {
+    return JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
+  } catch { return []; }
+}
+
+function saveLog(log) {
+  try { localStorage.setItem(LOG_KEY, JSON.stringify(log)); } catch {}
+}
+
+function saveCurrentGame() {
+  try {
+    const lastT = state.moves.length > 0
+      ? Math.max(...state.moves.map(m => m.t))
+      : 0;
+    localStorage.setItem(CURRENT_KEY, JSON.stringify({
+      difficulty: state.difficulty,
+      board: state.board,
+      moves: state.moves,
+      elapsed: lastT
+    }));
+  } catch {}
+}
+
+function loadCurrentGame() {
+  try {
+    return JSON.parse(localStorage.getItem(CURRENT_KEY) || 'null');
+  } catch { return null; }
+}
+
+function clearCurrentGame() {
+  try { localStorage.removeItem(CURRENT_KEY); } catch {}
+}
+
+//=============================================================
+// INIT
+//=============================================================
+function init() {
+  applyLang(detectLang());
+  document.querySelectorAll('.lang-switch button').forEach(b => {
+    b.addEventListener('click', () => {
+      applyLang(b.dataset.lang);
+      updateLogUI();
+    });
+  });
+  setupDifficulty();
+  setupActions();
+  setupPicker();
+  setupKeyboard();
+
+  const saved = loadCurrentGame();
+  if (saved && DIFFICULTIES[saved.difficulty] && Array.isArray(saved.board)) {
+    state.difficulty = saved.difficulty;
+    state.board = saved.board;
+    state.moves = saved.moves || [];
+    state.gameStart = saved.elapsed > 0 ? (Date.now() - saved.elapsed) : null;
+    document.querySelectorAll('.diff-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.diff === saved.difficulty);
+    });
+    renderBoard();
+    recomputeAndRender();
+  } else {
+    selectDifficulty('beginner');
+  }
+}
+
+function setupDifficulty() {
+  document.querySelectorAll('.diff-btn').forEach(btn => {
+    btn.addEventListener('click', () => selectDifficulty(btn.dataset.diff));
+  });
+}
+
+function setupActions() {
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    // Mark current game as abandoned if there were moves but no bomb
+    if (state.moves.length > 0) finalizeGame('abandoned');
+    resetBoard();
+  });
+
+  const hintsToggle = document.getElementById('hints-toggle');
+  hintsToggle.addEventListener('click', () => {
+    state.showHints = !state.showHints;
+    hintsToggle.classList.toggle('on', state.showHints);
+    document.body.classList.toggle('no-hints', !state.showHints);
+    renderBoard();
+  });
+  document.body.classList.toggle('no-hints', !state.showHints);
+
+  document.getElementById('copy-log-btn').addEventListener('click', copyLogToClipboard);
+  document.getElementById('paste-log-btn').addEventListener('click', pasteLogFromClipboard);
+  document.getElementById('log-select').addEventListener('change', e => renderLogMap(e.target.value));
+  document.getElementById('clear-log-btn').addEventListener('click', () => {
+    if (confirm('Удалить весь лог?')) {
+      saveLog([]);
+      updateLogUI();
+      showToast('Лог очищен');
+    }
+  });
+}
+
+function setupPicker() {
+  document.querySelectorAll('.picker-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (!state.picker) return;
+      const val = btn.dataset.val;
+      const { r, c } = state.picker;
+      setCell(r, c, val === 'clear' ? null : val);
+      closePicker();
+    });
+  });
+  document.getElementById('picker-backdrop').addEventListener('click', closePicker);
+}
+
+function setupKeyboard() {
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closePicker(); return; }
+    if (!state.picker) return;
+    const val = KEY_MAP[e.key];
+    if (val === undefined) return;
+    const { r, c } = state.picker;
+    setCell(r, c, val === 'clear' ? null : val);
+    closePicker();
+    e.preventDefault();
+  });
+}
+
+//=============================================================
+// DIFFICULTY / RESET
+//=============================================================
+function selectDifficulty(diff) {
+  state.difficulty = diff;
+  document.querySelectorAll('.diff-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.diff === diff);
+  });
+  resetBoard();
+  saveCurrentGame();
+}
+
+function resetBoard() {
+  const cfg = DIFFICULTIES[state.difficulty];
+  state.board = Array.from({ length: cfg.rows },
+    () => Array.from({ length: cfg.cols }, () => null));
+  state.probs = {};
+  state.moves = [];
+  state.gameStart = null;
+  clearCurrentGame();
+  closePicker();
+  renderBoard();
+  recomputeAndRender();
+  updateLogUI();
+}
+
+//=============================================================
+// PICKER
+//=============================================================
+function openPicker(r, c, cellEl) {
+  state.picker = { r, c };
+  const picker = document.getElementById('picker');
+  const backdrop = document.getElementById('picker-backdrop');
+  picker.classList.add('show');
+  backdrop.classList.add('show');
+
+  // Highlight currently selected option
+  const current = state.board[r][c];
+  document.querySelectorAll('.picker-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.val === current);
+  });
+
+  // Position picker near cell with edge detection
+  const rect = cellEl.getBoundingClientRect();
+  const pw = picker.offsetWidth;
+  const ph = picker.offsetHeight;
+  let top = rect.bottom + 8;
+  let left = rect.left + rect.width / 2 - pw / 2;
+  if (top + ph > window.innerHeight - 8) top = rect.top - ph - 8;
+  if (top < 8) top = 8;
+  if (left < 8) left = 8;
+  if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+  picker.style.top = `${top}px`;
+  picker.style.left = `${left}px`;
+}
+
+function closePicker() {
+  state.picker = null;
+  document.getElementById('picker').classList.remove('show');
+  document.getElementById('picker-backdrop').classList.remove('show');
+}
+
+//=============================================================
+// SET CELL VALUE
+//=============================================================
+function setCell(r, c, val) {
+  const prev = state.board[r][c];
+  // Game already over → review mode: just update board, no log writes, no finalize
+  const reviewMode = isGameOver();
+  state.board[r][c] = val;
+
+  if (reviewMode) {
+    renderBoard();
+    recomputeAndRender();
+    return;
+  }
+
+  // Track move for game log + snapshot of solver prediction at click time
+  if (val !== null) {
+    if (state.gameStart === null) state.gameStart = Date.now();
+    state.moves = state.moves.filter(m => !(m.r === r && m.c === c));
+    const p = state.probs[`${r},${c}`];
+    const snap = p ? {
+      pBomb: +(p.pBomb * 100).toFixed(1),
+      pRupoor: +(p.pRupoor * 100).toFixed(1),
+      pHaz: +(p.pHaz * 100).toFixed(1)
+    } : null;
+    state.moves.push({ r, c, val, t: Date.now() - state.gameStart, p: snap });
+  } else if (prev !== null) {
+    state.moves = state.moves.filter(m => !(m.r === r && m.c === c));
+  }
+
+  renderBoard();
+  recomputeAndRender();
+
+  if (val === 'bomb') {
+    showToast('💥 Бомба! Игра окончена — сохранено в лог.');
+    finalizeGame('bomb');
+    state.moves = [];
+    state.gameStart = null;
+    updateLogUI();
+  }
+  saveCurrentGame();
+}
+
+function computeScore() {
+  let s = 0;
+  for (const m of state.moves) {
+    if (m.val === 'bomb') break; // game over — no score change
+    else if (m.val === 'rupoor') s = Math.max(0, s - 10);
+    else if (RUPEES[m.val]) s += RUPEES[m.val].value;
+  }
+  return s;
+}
+
+function finalizeGame(outcome) {
+  if (state.moves.length === 0) return;
+  const cfg = DIFFICULTIES[state.difficulty];
+  const game = {
+    ts: new Date().toISOString(),
+    difficulty: state.difficulty,
+    rows: cfg.rows,
+    cols: cfg.cols,
+    bombs: cfg.bombs,
+    rupoors: cfg.rupoors,
+    outcome,
+    moves: state.moves.map(m => ({ r: m.r, c: m.c, v: m.val, t: m.t, p: m.p || null })),
+    score: computeScore(),
+    durationMs: Date.now() - (state.gameStart || Date.now())
+  };
+  const log = loadLog();
+  log.push(game);
+  saveLog(log);
+  updateLogUI();
+}
+
+function updateLogUI() {
+  const log = loadLog();
+  document.getElementById('games-count').textContent = log.length;
+  const best = log.reduce((b, g) => g.score > b ? g.score : b, -Infinity);
+  document.getElementById('best-score').textContent =
+    log.length ? best : '—';
+  const area = document.getElementById('log-area');
+  if (area) area.value = formatLog(log);
+
+  const select = document.getElementById('log-select');
+  if (!select) return;
+  const prevValue = select.value;
+  select.innerHTML = `<option value="">${I18N[currentLang].selectGame}</option>`;
+  for (let i = log.length - 1; i >= 0; i--) {
+    const g = log[i];
+    const date = new Date(g.ts).toLocaleString('ru-RU',
+      { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    const icon = g.outcome === 'bomb' ? '💀' : '⏸';
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `${date} · ${g.difficulty.slice(0,3)} · ${g.score} ${icon}`;
+    select.appendChild(opt);
+  }
+  if (prevValue && log[+prevValue]) select.value = prevValue;
+  renderLogMap(select.value);
+}
+
+function renderLogMap(idx) {
+  const map = document.getElementById('log-map');
+  if (!map) return;
+  if (idx === '' || idx == null) {
+    map.classList.remove('show');
+    map.innerHTML = '';
+    return;
+  }
+  const log = loadLog();
+  const g = log[+idx];
+  if (!g) return;
+  const cfg = DIFFICULTIES[g.difficulty];
+  const board = Array.from({ length: cfg.rows }, () =>
+    Array.from({ length: cfg.cols }, () => null));
+  for (const m of g.moves) board[m.r][m.c] = m.v;
+
+  map.style.gridTemplateColumns = `repeat(${cfg.cols}, 1fr)`;
+  map.innerHTML = '';
+  for (let r = 0; r < cfg.rows; r++) {
+    for (let c = 0; c < cfg.cols; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'mini-cell';
+      const v = board[r][c];
+      if (v) {
+        cell.classList.add('filled');
+        if (v === 'bomb') cell.classList.add('bomb-cell');
+        cell.appendChild(renderIcon(v));
+      }
+      map.appendChild(cell);
+    }
+  }
+  map.classList.add('show');
+}
+
+function formatLog(log) {
+  if (log.length === 0) return '';
+  // Compact JSON, one game per line for easy reading
+  return log.map(g => JSON.stringify(g)).join('\n');
+}
+
+async function pasteLogFromClipboard() {
+  let text = '';
+  try {
+    text = await navigator.clipboard.readText();
+  } catch {
+    text = prompt('Вставь JSON-партии (по одной на строку):') || '';
+  }
+  if (!text.trim()) { showToast('Пусто'); return; }
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const games = [];
+  for (const line of lines) {
+    try {
+      const g = JSON.parse(line);
+      if (g.ts && g.difficulty && Array.isArray(g.moves)) games.push(g);
+    } catch {}
+  }
+  if (games.length === 0) { showToast('Не нашёл партий в JSON'); return; }
+  const log = loadLog();
+  const seen = new Set(log.map(g => g.ts));
+  let added = 0;
+  for (const g of games) if (!seen.has(g.ts)) { log.push(g); added++; }
+  log.sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+  saveLog(log);
+  updateLogUI();
+  const word = added === 1 ? 'партия' : added < 5 ? 'партии' : 'партий';
+  showToast(`✓ Добавлено ${added} ${word} (${games.length - added} уже были)`);
+}
+
+async function copyLogToClipboard() {
+  const log = loadLog();
+  if (log.length === 0) {
+    showToast('Лог пуст — пока нечего копировать');
+    return;
+  }
+  const text = formatLog(log);
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast(`✓ Скопировано ${log.length} парти${log.length === 1 ? 'я' : log.length < 5 ? 'и' : 'й'}`);
+  } catch {
+    // Fallback: select textarea
+    const area = document.getElementById('log-area');
+    area.select();
+    document.execCommand('copy');
+    showToast('✓ Скопировано (через textarea)');
+  }
+}
+
+//=============================================================
+// RENDER BOARD
+//=============================================================
+function isGameOver() {
+  const cfg = DIFFICULTIES[state.difficulty];
+  for (let r = 0; r < cfg.rows; r++)
+    for (let c = 0; c < cfg.cols; c++)
+      if (state.board[r][c] === 'bomb') return true;
+  return false;
+}
+
+// Strategy: global min pHaz, no spatial bias.
+// Studholme's Step 7 corner-preference assumes Minesweeper cascade (zero-cell auto-reveal),
+// which Thrill Digger lacks. Empirical audit (10000 paired games) confirms global min
+// outperforms Studholme by Δ = +11.16 ± 1.09 (95% CI [9.02, 13.31]) per game.
+// Refs:
+//   Studholme — https://www.cs.toronto.edu/~cvs/minesweeper/minesweeper.pdf
+const SUGGEST_CEILING = 0.20;
+const HIGHLIGHT_TOLERANCE = 0.03;
+
+function findCandidates() {
+  const cfg = DIFFICULTIES[state.difficulty];
+
+  let anyOpened = false;
+  outer:
+  for (let r = 0; r < cfg.rows; r++)
+    for (let c = 0; c < cfg.cols; c++)
+      if (state.board[r][c] !== null) { anyOpened = true; break outer; }
+  if (!anyOpened) {
+    const ranks = new Map([['0,0', 1]]);
+    return { ranks, bestEv: null, bestP: state.probs['0,0'] || null };
+  }
+
+  const scored = [];
+  for (let r = 0; r < cfg.rows; r++) {
+    for (let c = 0; c < cfg.cols; c++) {
+      if (state.board[r][c] !== null) continue;
+      const p = state.probs[`${r},${c}`];
+      if (!p) continue;
+      let unrev = 0;
+      for (const [nr, nc] of getNeighbors(r, c, cfg))
+        if (state.board[nr][nc] === null) unrev++;
+      const u = p.pHaz - 0.020 * unrev;
+      scored.push({ r, c, p, unrev, u });
+    }
+  }
+  if (scored.length === 0) return { ranks: new Map(), bestEv: null, bestP: null };
+
+  scored.sort((a, b) => a.u - b.u);
+  const bestP = scored[0].p;
+
+  const ranks = new Map();
+  const seenU = [];
+  for (const s of scored) {
+    if (s.p.pHaz > 0.50) break;
+    let rank = seenU.findIndex(u => Math.abs(u - s.u) < 0.003) + 1;
+    if (rank === 0) {
+      seenU.push(s.u);
+      rank = seenU.length;
+    }
+    if (rank > 3) break;
+    ranks.set(`${s.r},${s.c}`, rank);
+  }
+
+  const score = computeScore();
+  const avgRupee = getAvgRupee();
+  const rupoorLoss = Math.min(score, 10);
+  const bestEv = Math.max(0, 1 - bestP.pHaz) * avgRupee - bestP.pRupoor * rupoorLoss;
+  return { ranks, bestEv, bestP };
+}
+
+function computeAdvice() {
+  const cfg = DIFFICULTIES[state.difficulty];
+  const score = computeScore();
+
+  // Count known cells
+  let opened = 0, knownBombs = 0, knownRupoors = 0;
+  let knownSilver = 0, knownGold = 0;
+  for (let r = 0; r < cfg.rows; r++) {
+    for (let c = 0; c < cfg.cols; c++) {
+      const v = state.board[r][c];
+      if (!v) continue;
+      opened++;
+      if (v === 'bomb') knownBombs++;
+      else if (v === 'rupoor') knownRupoors++;
+      else if (v === 'silver') knownSilver++;
+      else if (v === 'gold') knownGold++;
+    }
+  }
+  const total = cfg.rows * cfg.cols;
+  const unknownCount = total - opened;
+  const remBombs = Math.max(0, cfg.bombs - knownBombs);
+  const remRupoors = Math.max(0, cfg.rupoors - knownRupoors);
+  const remHazards = remBombs + remRupoors;
+  const density = unknownCount > 0 ? remHazards / unknownCount : 0;
+
+  // Game over short-circuit
+  if (isGameOver()) {
+    return {
+      best: null, ev: null, shouldStop: false, score, gameOver: true,
+      density, remBombs, remRupoors, tip: null
+    };
+  }
+
+  const cand = findCandidates();
+  if (!cand.bestP) {
+    return { ranks: cand.ranks, ev: null, score, gameOver: false, density, remBombs, remRupoors, tip: null };
+  }
+
+  const pBomb = cand.bestP.pBomb;
+  const pRupoor = cand.bestP.pRupoor;
+  const pSafe = Math.max(0, 1 - pBomb - pRupoor);
+  const ev = cand.bestEv;
+
+  // Check if any cell is forced hazard (pHaz=1) but not yet revealed
+  let hasForced = false;
+  for (const k in state.probs) {
+    if (state.probs[k].pHaz === 1) { hasForced = true; break; }
+  }
+
+  const ctx = { knownSilver, knownGold, knownRupoors, remRupoors, remBombs,
+                density, score, bestBomb: pBomb, bestEv: ev, hasForced };
+  const tip = pickTip(ctx);
+
+  return {
+    ranks: cand.ranks, ev, pBomb, pRupoor, pSafe, score,
+    gameOver: false, density, remBombs, remRupoors, tip
+  };
+}
+
+function pickTip(ctx) {
+  // Facts only — no premature "stop now" prescriptions
+  if (ctx.hasForced)
+    return '💣 На доске есть 100% опасности (красная пульсация) — НЕ копай!';
+  if ((ctx.knownSilver > 0 || ctx.knownGold > 0) && ctx.density > 0.4)
+    return '⚠️ Silver/Gold открыт — соседи в его зоне скорее forced';
+  if (ctx.knownRupoors >= 5 && ctx.remRupoors <= 1)
+    return '💣 Осталось ' + ctx.remBombs + '💣 и ' + ctx.remRupoors + '✕ — перекос на бомбы';
+  if (ctx.density > 0.6 && ctx.score >= 100)
+    return '🔥 Плотность ' + (ctx.density * 100).toFixed(0) + '% — впереди минное поле';
+  return null;
+}
+
+function updateAdvice() {
+  const a = computeAdvice();
+  state.advice = a;
+
+  const adv = document.getElementById('advice');
+  const evEl = document.getElementById('adv-ev');
+  const bombEl = document.getElementById('adv-bomb');
+  const ruEl = document.getElementById('adv-rupoor');
+  const safeEl = document.getElementById('adv-safe');
+  const densityEl = document.getElementById('adv-density');
+  const remainingEl = document.getElementById('adv-remaining');
+  const hintEl = document.getElementById('adv-hint');
+  const tipEl = document.getElementById('advice-tip');
+
+  // Always show density & remaining (useful even after game over)
+  densityEl.textContent = (a.density * 100).toFixed(0) + '%';
+  densityEl.className = 'value ' + (a.density < 0.3 ? 'bomb-low' : a.density < 0.5 ? 'bomb-mid' : 'bomb-hi');
+  remainingEl.textContent = `${a.remBombs}💣/${a.remRupoors}✕`;
+
+  // Game over: dim panel
+  if (a.gameOver) {
+    evEl.textContent = bombEl.textContent = ruEl.textContent = safeEl.textContent = '—';
+    evEl.className = bombEl.className = 'value';
+    adv.classList.add('game-over');
+    tipEl.classList.remove('show');
+    document.getElementById('adv-bankvs').innerHTML = `<span style="color:var(--muted)">💀 счёт ${a.score}</span>`;
+    return;
+  }
+
+  adv.classList.remove('game-over');
+
+  if (a.ev === null || a.pBomb === undefined) {
+    evEl.textContent = bombEl.textContent = ruEl.textContent = safeEl.textContent = '—';
+    evEl.className = bombEl.className = 'value';
+    tipEl.classList.remove('show');
+    document.getElementById('adv-bankvs').innerHTML = '<span style="color:var(--muted)">—</span>';
+    return;
+  }
+
+  evEl.textContent = (a.ev >= 0 ? '+' : '') + a.ev.toFixed(1);
+  evEl.className = 'value ' + (a.ev >= 0 ? 'ev-pos' : 'ev-neg');
+  bombEl.textContent = (a.pBomb * 100).toFixed(a.pBomb < 0.1 ? 1 : 0) + '%';
+  bombEl.className = 'value ' + (a.pBomb < 0.05 ? 'bomb-low' : a.pBomb < 0.15 ? 'bomb-mid' : 'bomb-hi');
+  ruEl.textContent = (a.pRupoor * 100).toFixed(a.pRupoor < 0.1 ? 1 : 0) + '%';
+  safeEl.textContent = (a.pSafe * 100).toFixed(0) + '%';
+
+  // Bank vs continue EV — explicit comparison
+  const bankVsEl = document.getElementById('adv-bankvs');
+  if (a.score > 0) {
+    bankVsEl.innerHTML = `<span style="color:var(--safe)">${a.score}</span> vs <span style="color:var(--text)">+${a.ev.toFixed(0)}</span>`;
+  } else {
+    bankVsEl.innerHTML = `<span style="color:var(--muted)">—</span>`;
+  }
+
+  if (a.tip) {
+    tipEl.textContent = a.tip;
+    tipEl.classList.add('show');
+  } else {
+    tipEl.classList.remove('show');
+  }
+}
+
+function renderBoard() {
+  const cfg = DIFFICULTIES[state.difficulty];
+  const board = document.getElementById('board');
+  board.style.gridTemplateColumns = `repeat(${cfg.cols}, auto)`;
+  board.style.setProperty('--cols', cfg.cols);
+  board.style.setProperty('--gap-count', cfg.cols - 1);
+  board.innerHTML = '';
+  const advice = state.showHints ? (state.advice || computeAdvice()) : null;
+  const ranks = advice && advice.ranks ? advice.ranks : new Map();
+
+  for (let r = 0; r < cfg.rows; r++) {
+    for (let c = 0; c < cfg.cols; c++) {
+      const val = state.board[r][c];
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.r = r;
+      cell.dataset.c = c;
+
+      if (val !== null) {
+        cell.classList.add('revealed');
+        cell.appendChild(renderIcon(val));
+      } else if (state.showHints) {
+        const pr = state.probs[`${r},${c}`];
+        if (pr !== undefined) {
+          const cfg = DIFFICULTIES[state.difficulty];
+          const pb = pr.pBomb;
+
+          // Check if cell has ANY revealed neighbor (= it has info)
+          let hasInfo = false;
+          for (const [nr, nc] of getNeighbors(r, c, cfg)) {
+            if (state.board[nr][nc] !== null) { hasInfo = true; break; }
+          }
+
+          if (hasInfo) {
+            let hue, sat, lightTop, lightBot, borderL;
+            if (pb < 0.33) {
+              hue = Math.round(120 * (1 - pb / 0.33));
+              sat = 70;
+              lightTop = 40;
+              lightBot = 24;
+              borderL = 15;
+            } else {
+              const over = Math.min(1, (pb - 0.33) / 0.5);
+              hue = 0;
+              sat = 75 + Math.round(over * 20);
+              lightTop = Math.round(38 - over * 22);
+              lightBot = Math.round(22 - over * 16);
+              borderL = Math.max(4, 14 - Math.round(over * 12));
+            }
+            cell.style.background =
+              `linear-gradient(180deg, hsl(${hue}, ${sat}%, ${lightTop}%), hsl(${hue}, ${sat}%, ${lightBot}%))`;
+            cell.style.borderColor = `hsl(${hue}, ${sat}%, ${borderL}%)`;
+
+            if (pr.pHaz === 0) cell.classList.add('safe');
+            else if (pb === 1) cell.classList.add('danger');
+            else if (pr.pHaz === 1) cell.classList.add('forced');
+            const rank = ranks.get(`${r},${c}`);
+            if (rank) {
+              cell.classList.add('suggested', `suggested-${rank}`);
+              const rb = document.createElement('span');
+              rb.className = 'rank-badge';
+              rb.textContent = rank;
+              cell.appendChild(rb);
+            }
+
+            const wrap = document.createElement('div');
+            wrap.className = 'prob-wrap';
+            const bombEl = document.createElement('span');
+            bombEl.className = 'p-bomb';
+            if (pr.pHaz === 1 || pb >= 0.5) {
+              const ns = 'http://www.w3.org/2000/svg';
+              const svg = document.createElementNS(ns, 'svg');
+              svg.classList.add('forced-mark');
+              svg.setAttribute('viewBox', '0 0 100 100');
+              const use = document.createElementNS(ns, 'use');
+              use.setAttribute('href', '#bomb');
+              svg.appendChild(use);
+              bombEl.appendChild(svg);
+            }
+            bombEl.appendChild(document.createTextNode(Math.round(pb * 100) + '%'));
+            wrap.appendChild(bombEl);
+            if (cfg.rupoors > 0) {
+              const ruEl = document.createElement('span');
+              ruEl.className = 'p-rupoor';
+              ruEl.textContent = Math.round(pr.pRupoor * 100) + '%';
+              wrap.appendChild(ruEl);
+            }
+            cell.appendChild(wrap);
+          } else {
+            // No info — brown bg, prominent ?, dimmed % below
+            const rank = ranks.get(`${r},${c}`);
+            if (rank) {
+              cell.classList.add('suggested', `suggested-${rank}`);
+              const rb = document.createElement('span');
+              rb.className = 'rank-badge';
+              rb.textContent = rank;
+              cell.appendChild(rb);
+            }
+            const wrap = document.createElement('div');
+            wrap.className = 'prob-wrap';
+            const q = document.createElement('span');
+            q.className = 'p-unknown';
+            q.textContent = '?';
+            wrap.appendChild(q);
+            const pct = document.createElement('span');
+            pct.className = 'p-dim';
+            pct.textContent = Math.round(pb * 100) + '%';
+            wrap.appendChild(pct);
+            cell.appendChild(wrap);
+          }
+        }
+      }
+
+      cell.addEventListener('click', () => openPicker(r, c, cell));
+
+      // Hover constraint visualization (only on revealed rupee cells)
+      if (val !== null && !HAZARDS.has(val) && RUPEES[val]) {
+        cell.addEventListener('mouseenter', () => {
+          cell.classList.add('constraint-source');
+          for (const [nr, nc] of getNeighbors(r, c, cfg)) {
+            const idx = nr * cfg.cols + nc;
+            const el = board.children[idx];
+            if (el) el.classList.add('constrained');
+          }
+        });
+        cell.addEventListener('mouseleave', () => {
+          cell.classList.remove('constraint-source');
+          board.querySelectorAll('.constrained').forEach(el => el.classList.remove('constrained'));
+        });
+      }
+
+      board.appendChild(cell);
+    }
+  }
+}
+
+function renderIcon(val) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.classList.add('icon');
+  svg.setAttribute('viewBox', '0 0 100 100');
+  const use = document.createElementNS(ns, 'use');
+  if (val === 'bomb') {
+    use.setAttribute('href', '#bomb');
+  } else if (val === 'rupoor') {
+    use.setAttribute('href', '#rupoor');
+  } else {
+    use.setAttribute('href', '#rupee');
+    svg.style.fill = RUPEES[val].color;
+  }
+  svg.appendChild(use);
+  return svg;
+}
+
+//=============================================================
+// NEIGHBORS
+//=============================================================
+function getNeighbors(r, c, cfg) {
+  const out = [];
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const nr = r + dr, nc = c + dc;
+      if (nr < 0 || nr >= cfg.rows || nc < 0 || nc >= cfg.cols) continue;
+      out.push([nr, nc]);
+    }
+  }
+  return out;
+}
+
+//=============================================================
+// SOLVER (constraint satisfaction with backtracking)
+//=============================================================
+function binom(n, k) {
+  if (k < 0 || k > n) return 0;
+  if (k === 0 || k === n) return 1;
+  k = Math.min(k, n - k);
+  let r = 1;
+  for (let i = 0; i < k; i++) r = r * (n - i) / (i + 1);
+  return r;
+}
+
+function solve() {
+  const cfg = DIFFICULTIES[state.difficulty];
+  const totalHazards = cfg.bombs + cfg.rupoors;
+
+  // Gather state
+  let knownBombs = 0, knownRupoors = 0;
+  const unknown = [];
+  for (let r = 0; r < cfg.rows; r++) {
+    for (let c = 0; c < cfg.cols; c++) {
+      const v = state.board[r][c];
+      if (v === 'bomb') knownBombs++;
+      else if (v === 'rupoor') knownRupoors++;
+      else if (v === null) unknown.push([r, c]);
+    }
+  }
+  const knownHazardCount = knownBombs + knownRupoors;
+  const remainingHazards = totalHazards - knownHazardCount;
+  const remBombs = Math.max(0, cfg.bombs - knownBombs);
+  const remRupoors = Math.max(0, cfg.rupoors - knownRupoors);
+
+  // Bomb/rupoor split among hazards (uniform conditional, since random placement)
+  const bombShare = remainingHazards > 0 ? remBombs / remainingHazards : 0;
+  const rupoorShare = remainingHazards > 0 ? remRupoors / remainingHazards : 0;
+  function splitProbs(probsHaz) {
+    const out = {};
+    for (const k in probsHaz) {
+      const p = probsHaz[k];
+      out[k] = { pBomb: p * bombShare, pRupoor: p * rupoorShare, pHaz: p };
+    }
+    return out;
+  }
+
+  // Uniform fallback — ALWAYS returns something
+  function uniformProbs() {
+    const out = {};
+    if (unknown.length === 0) return out;
+    const p = Math.max(0, Math.min(1, remainingHazards / unknown.length));
+    for (const [r, c] of unknown) out[`${r},${c}`] = p;
+    return out;
+  }
+
+  if (unknown.length === 0) return { probs: splitProbs({}), status: 'ok' };
+
+  // Build raw constraints from revealed rupee cells
+  const rawCons = [];
+  for (let r = 0; r < cfg.rows; r++) {
+    for (let c = 0; c < cfg.cols; c++) {
+      const v = state.board[r][c];
+      if (!v || HAZARDS.has(v)) continue;
+      const neighbors = getNeighbors(r, c, cfg);
+      let fixed = 0;
+      const varKeys = [];
+      for (const [nr, nc] of neighbors) {
+        const nv = state.board[nr][nc];
+        if (HAZARDS.has(nv)) fixed++;
+        else if (nv === null) varKeys.push(`${nr},${nc}`);
+      }
+      rawCons.push({ range: RUPEES[v].range, fixed, varKeys, owner: [r, c] });
+    }
+  }
+
+  // Pre-check: any constraint impossible from the start?
+  for (const con of rawCons) {
+    if (con.fixed > con.range[1] || con.fixed + con.varKeys.length < con.range[0]) {
+      return { probs: splitProbs(uniformProbs()), status: 'contradiction', where: con.owner };
+    }
+  }
+  if (remainingHazards < 0 || remainingHazards > unknown.length) {
+    return { probs: splitProbs(uniformProbs()), status: 'contradiction' };
+  }
+
+  // Map unknown cells to indices
+  const uIdx = new Map();
+  unknown.forEach(([r, c], i) => uIdx.set(`${r},${c}`, i));
+  const N = unknown.length;
+
+  // Constraints in terms of unknown indices
+  const cons = rawCons.map(con => ({
+    range: con.range,
+    fixed: con.fixed,
+    vars: con.varKeys.map(k => uIdx.get(k))
+  }));
+
+  // assignment: -1 = undecided, 0 = safe, 1 = hazard
+  const assign = new Array(N).fill(-1);
+  let nHaz = 0, nSafe = 0;
+
+  // CONSTRAINT PROPAGATION (iterate until fixed point)
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const con of cons) {
+      let h = con.fixed;
+      const undec = [];
+      for (const v of con.vars) {
+        const a = assign[v];
+        if (a === 1) h++;
+        else if (a === -1) undec.push(v);
+      }
+      if (h > con.range[1]) return { probs: splitProbs(uniformProbs()), status: 'contradiction' };
+      if (h + undec.length < con.range[0]) return { probs: splitProbs(uniformProbs()), status: 'contradiction' };
+      // Force all undecided to safe
+      if (h === con.range[1] && undec.length > 0) {
+        for (const v of undec) { assign[v] = 0; nSafe++; }
+        changed = true;
+      }
+      // Force all undecided to hazard
+      else if (h + undec.length === con.range[0] && undec.length > 0) {
+        for (const v of undec) { assign[v] = 1; nHaz++; }
+        changed = true;
+      }
+    }
+    if (nHaz > remainingHazards) return { probs: splitProbs(uniformProbs()), status: 'contradiction' };
+    const undecCount = N - nSafe - nHaz;
+    if (nHaz + undecCount < remainingHazards) return { probs: splitProbs(uniformProbs()), status: 'contradiction' };
+    // Global budget exhausted → rest must be safe
+    if (nHaz === remainingHazards && undecCount > 0) {
+      for (let i = 0; i < N; i++) if (assign[i] === -1) { assign[i] = 0; nSafe++; }
+      changed = true;
+    }
+    // All remaining must be hazards to reach budget
+    else if (nHaz + undecCount === remainingHazards && undecCount > 0) {
+      for (let i = 0; i < N; i++) if (assign[i] === -1) { assign[i] = 1; nHaz++; }
+      changed = true;
+    }
+  }
+
+  // Result accumulator
+  const probs = {};
+  for (let i = 0; i < N; i++) {
+    if (assign[i] !== -1) {
+      const [r, c] = unknown[i];
+      probs[`${r},${c}`] = assign[i];
+    }
+  }
+
+  // Find remaining undecided variables
+  const undecided = [];
+  for (let i = 0; i < N; i++) if (assign[i] === -1) undecided.push(i);
+  if (undecided.length === 0) return { probs: splitProbs(probs), status: 'ok' };
+
+  // Frontier = undecided vars that appear in any constraint
+  const inCon = new Set();
+  for (const con of cons) for (const v of con.vars) if (assign[v] === -1) inCon.add(v);
+  const frontier = undecided.filter(v => inCon.has(v));
+  const interior = undecided.filter(v => !inCon.has(v));
+  const remHaz = remainingHazards - nHaz;
+
+  // Trim constraints: skip fully-determined ones, remap vars to frontier index
+  const fIdx = new Map();
+  frontier.forEach((v, i) => fIdx.set(v, i));
+  const liveCons = [];
+  for (const con of cons) {
+    let h = con.fixed;
+    const vars = [];
+    for (const v of con.vars) {
+      const a = assign[v];
+      if (a === 1) h++;
+      else if (a === -1) vars.push(fIdx.get(v));
+    }
+    if (vars.length > 0) liveCons.push({ range: con.range, fixed: h, vars });
+  }
+
+  // No frontier → uniform over interior
+  if (frontier.length === 0) {
+    if (interior.length > 0) {
+      const p = Math.max(0, Math.min(1, remHaz / interior.length));
+      for (const v of interior) {
+        const [r, c] = unknown[v];
+        probs[`${r},${c}`] = p;
+      }
+    }
+    return { probs: splitProbs(probs), status: 'ok' };
+  }
+
+  // Order frontier by appearance count (more constrained → tried first) for pruning
+  const conCount = new Array(frontier.length).fill(0);
+  for (const con of liveCons) for (const v of con.vars) conCount[v]++;
+  const order = frontier.map((_, i) => i).sort((a, b) => conCount[b] - conCount[a]);
+
+  // Backtracking with iteration budget
+  const F = frontier.length;
+  const fA = new Array(F).fill(-1);
+  const fHazW = new Array(F).fill(0);
+  let totalWeight = 0;
+  let interiorWeight = 0;
+  let iter = 0;
+  const ITER_LIMIT = 800000;
+  let aborted = false;
+
+  function checkAll() {
+    for (const con of liveCons) {
+      let h = con.fixed;
+      let undec = 0;
+      for (const v of con.vars) {
+        const a = fA[v];
+        if (a === 1) h++;
+        else if (a === -1) undec++;
+      }
+      if (h > con.range[1]) return false;
+      if (h + undec < con.range[0]) return false;
+    }
+    return true;
+  }
+
+  function bt(pos, hazCount) {
+    if (aborted) return;
+    iter++;
+    if (iter > ITER_LIMIT) { aborted = true; return; }
+    if (hazCount > remHaz) return;
+    if (pos === F) {
+      const rem = remHaz - hazCount;
+      if (rem < 0 || rem > interior.length) return;
+      const w = binom(interior.length, rem);
+      if (w === 0) return;
+      totalWeight += w;
+      for (let i = 0; i < F; i++) if (fA[i] === 1) fHazW[i] += w;
+      if (interior.length > 0) interiorWeight += w * rem / interior.length;
+      return;
+    }
+    const idx = order[pos];
+    fA[idx] = 1;
+    if (checkAll()) bt(pos + 1, hazCount + 1);
+    fA[idx] = 0;
+    if (checkAll()) bt(pos + 1, hazCount);
+    fA[idx] = -1;
+  }
+
+  bt(0, 0);
+
+  if (totalWeight === 0 || aborted) {
+    // Fallback: uniform over all undecided
+    const p = Math.max(0, Math.min(1, remHaz / undecided.length));
+    for (const v of undecided) {
+      const [r, c] = unknown[v];
+      probs[`${r},${c}`] = p;
+    }
+    return {
+      probs: splitProbs(probs),
+      status: aborted ? 'aborted' : 'contradiction'
+    };
+  }
+
+  for (let i = 0; i < F; i++) {
+    const [r, c] = unknown[frontier[i]];
+    probs[`${r},${c}`] = fHazW[i] / totalWeight;
+  }
+  if (interior.length > 0) {
+    const ip = Math.max(0, Math.min(1, interiorWeight / totalWeight));
+    for (const v of interior) {
+      const [r, c] = unknown[v];
+      probs[`${r},${c}`] = ip;
+    }
+  }
+  return { probs: splitProbs(probs), status: 'ok' };
+}
+
+//=============================================================
+// RECOMPUTE & STATS
+//=============================================================
+function recomputeAndRender() {
+  let result;
+  try {
+    result = solve();
+  } catch (e) {
+    console.error('Solver error:', e);
+    result = { probs: {}, status: 'error' };
+  }
+  state.probs = result.probs || {};
+
+  if (result.status === 'contradiction') {
+    showToast('⚠️ Противоречие в раскладке — показываю равномерные оценки');
+  } else if (result.status === 'aborted') {
+    showToast('⏱ Слишком сложная позиция — приближённые оценки');
+  } else if (result.status === 'error') {
+    showToast('❌ Ошибка солвера — см. консоль');
+  }
+
+  updateAdvice();
+  updateStats();
+  renderBoard();
+}
+
+function updateStats() {
+  const cfg = DIFFICULTIES[state.difficulty];
+  let opened = 0, hazardsFound = 0, dead = false;
+
+  for (let r = 0; r < cfg.rows; r++) {
+    for (let c = 0; c < cfg.cols; c++) {
+      const v = state.board[r][c];
+      if (!v) continue;
+      opened++;
+      if (v === 'bomb') { dead = true; hazardsFound++; }
+      else if (v === 'rupoor') hazardsFound++;
+    }
+  }
+
+  const score = computeScore();
+  let safeCount = 0;
+  for (const k in state.probs) {
+    if (state.probs[k] && state.probs[k].pHaz === 0) safeCount++;
+  }
+
+  document.getElementById('score-val').textContent = score;
+  document.getElementById('score-val').style.color = dead ? 'var(--danger)' : 'var(--gold)';
+  const rcNum = document.getElementById('rc-num');
+  rcNum.textContent = score;
+  rcNum.classList.toggle('dead', dead);
+  document.getElementById('opened-val').textContent = opened;
+  document.getElementById('hazards-val').textContent =
+    `${hazardsFound}/${cfg.bombs + cfg.rupoors}`;
+  document.getElementById('safe-val').textContent = safeCount;
+}
+
+//=============================================================
+// TOAST
+//=============================================================
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+//=============================================================
+// BOOT
+//=============================================================
+init();
+updateLogUI();
+</script>
+</body>
+</html>
