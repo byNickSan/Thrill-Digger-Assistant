@@ -188,7 +188,20 @@
 
   body.no-hints .advice,
   body.no-hints .advice-tip { display: none; }
-  body.no-hints .board { border-color: rgba(120, 140, 90, 0.4); }
+  body.play-mode .board { border-color: rgba(140, 180, 100, 0.7); box-shadow: var(--shadow), inset 0 0 30px rgba(0, 0, 0, 0.6), 0 0 30px rgba(140, 180, 100, 0.2); }
+  .cell.truth-revealed {
+    background: linear-gradient(180deg, #3d2e1f, #221710);
+    border-color: #2a1e12;
+    opacity: 0.85;
+    cursor: default;
+  }
+  .cell .truth-corner {
+    width: 60%;
+    height: 60%;
+    pointer-events: none;
+    opacity: 0.7;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
+  }
 
   .training-badge {
     display: none;
@@ -943,6 +956,10 @@
         <span data-i18n="solverHints">Подсказки солвера</span>
         <span class="switch"></span>
       </div>
+      <div class="toggle" id="game-toggle">
+        <span data-i18n="gameMode">🎮 Игровой режим</span>
+        <span class="switch"></span>
+      </div>
 
       <h2 style="margin-top:14px" data-i18n="stats">Статистика</h2>
       <div class="stats">
@@ -1128,6 +1145,7 @@ const I18N = {
     controls: 'Управление',
     reset: 'Сбросить',
     solverHints: 'Подсказки солвера',
+    gameMode: '🎮 Игровой режим',
     stats: 'Статистика',
     score: 'Счёт',
     opened: 'Открыто',
@@ -1166,6 +1184,7 @@ const I18N = {
     controls: 'Controls',
     reset: 'Reset',
     solverHints: 'Solver hints',
+    gameMode: '🎮 Play mode',
     stats: 'Stats',
     score: 'Score',
     opened: 'Opened',
@@ -1277,12 +1296,14 @@ const KEY_MAP = {
 //=============================================================
 const state = {
   difficulty: 'beginner',
-  board: [],              // 2D array: null | rupee key | 'bomb' | 'rupoor'
-  picker: null,           // {r, c} or null
+  board: [],
+  picker: null,
   showHints: true,
-  probs: {},              // "r,c" -> probability of hazard
-  moves: [],              // current game moves: [{r, c, val, t}]
-  gameStart: null         // timestamp when first move was made
+  gameMode: false,
+  truth: null,
+  probs: {},
+  moves: [],
+  gameStart: null
 };
 
 const LOG_KEY = 'thrillDiggerLog';
@@ -1316,6 +1337,43 @@ function loadCurrentGame() {
   try {
     return JSON.parse(localStorage.getItem(CURRENT_KEY) || 'null');
   } catch { return null; }
+}
+
+function generateTruth(difficulty) {
+  const cfg = DIFFICULTIES[difficulty];
+  const truth = Array.from({ length: cfg.rows }, () =>
+    new Array(cfg.cols).fill('safe'));
+  const cells = [];
+  for (let r = 0; r < cfg.rows; r++)
+    for (let c = 0; c < cfg.cols; c++)
+      cells.push([r, c]);
+  for (let i = cells.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [cells[i], cells[j]] = [cells[j], cells[i]];
+  }
+  for (let i = 0; i < cfg.bombs; i++) {
+    const [r, c] = cells[i];
+    truth[r][c] = 'bomb';
+  }
+  for (let i = cfg.bombs; i < cfg.bombs + cfg.rupoors; i++) {
+    const [r, c] = cells[i];
+    truth[r][c] = 'rupoor';
+  }
+  return truth;
+}
+
+function colorFromTruth(r, c) {
+  const cfg = DIFFICULTIES[state.difficulty];
+  let count = 0;
+  for (const [nr, nc] of getNeighbors(r, c, cfg)) {
+    const v = state.truth[nr][nc];
+    if (v === 'bomb' || v === 'rupoor') count++;
+  }
+  if (count === 0) return 'green';
+  if (count <= 2) return 'blue';
+  if (count <= 4) return 'red';
+  if (count <= 6) return 'silver';
+  return 'gold';
 }
 
 function clearCurrentGame() {
@@ -1376,6 +1434,20 @@ function setupActions() {
   });
   document.body.classList.toggle('no-hints', !state.showHints);
 
+  const gameToggle = document.getElementById('game-toggle');
+  gameToggle.addEventListener('click', () => {
+    state.gameMode = !state.gameMode;
+    gameToggle.classList.toggle('on', state.gameMode);
+    document.body.classList.toggle('play-mode', state.gameMode);
+    if (state.gameMode) {
+      state.truth = generateTruth(state.difficulty);
+      resetBoard();
+    } else {
+      state.truth = null;
+      resetBoard();
+    }
+  });
+
   document.getElementById('copy-log-btn').addEventListener('click', copyLogToClipboard);
   document.getElementById('paste-log-btn').addEventListener('click', pasteLogFromClipboard);
   document.getElementById('log-select').addEventListener('change', e => renderLogMap(e.target.value));
@@ -1434,6 +1506,7 @@ function resetBoard() {
   state.probs = {};
   state.moves = [];
   state.gameStart = null;
+  if (state.gameMode) state.truth = generateTruth(state.difficulty);
   clearCurrentGame();
   closePicker();
   renderBoard();
@@ -1688,16 +1761,6 @@ const HIGHLIGHT_TOLERANCE = 0.03;
 function findCandidates() {
   const cfg = DIFFICULTIES[state.difficulty];
 
-  let anyOpened = false;
-  outer:
-  for (let r = 0; r < cfg.rows; r++)
-    for (let c = 0; c < cfg.cols; c++)
-      if (state.board[r][c] !== null) { anyOpened = true; break outer; }
-  if (!anyOpened) {
-    const ranks = new Map([['0,0', 1]]);
-    return { ranks, bestEv: null, bestP: state.probs['0,0'] || null };
-  }
-
   const scored = [];
   for (let r = 0; r < cfg.rows; r++) {
     for (let c = 0; c < cfg.cols; c++) {
@@ -1888,9 +1951,18 @@ function renderBoard() {
       cell.dataset.r = r;
       cell.dataset.c = c;
 
+      const showTruthCorner = val === null && state.gameMode && state.truth && isGameOver();
+
       if (val !== null) {
         cell.classList.add('revealed');
         cell.appendChild(renderIcon(val));
+      } else if (showTruthCorner) {
+        const t = state.truth[r][c];
+        const tv = (t === 'bomb' || t === 'rupoor') ? t : colorFromTruth(r, c);
+        cell.classList.add('truth-revealed');
+        const ico = renderIcon(tv);
+        ico.classList.add('truth-corner');
+        cell.appendChild(ico);
       } else if (state.showHints) {
         const pr = state.probs[`${r},${c}`];
         if (pr !== undefined) {
@@ -1983,7 +2055,16 @@ function renderBoard() {
         }
       }
 
-      cell.addEventListener('click', () => openPicker(r, c, cell));
+      cell.addEventListener('click', () => {
+        if (state.gameMode) {
+          if (isGameOver() || state.board[r][c] !== null || !state.truth) return;
+          const t = state.truth[r][c];
+          const v = (t === 'bomb' || t === 'rupoor') ? t : colorFromTruth(r, c);
+          setCell(r, c, v);
+        } else {
+          openPicker(r, c, cell);
+        }
+      });
 
       // Hover constraint visualization (only on revealed rupee cells)
       if (val !== null && !HAZARDS.has(val) && RUPEES[val]) {
