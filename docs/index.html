@@ -196,11 +196,50 @@
     cursor: default;
   }
   .cell .truth-corner {
-    width: 60%;
-    height: 60%;
+    width: 38%;
+    height: 38%;
     pointer-events: none;
-    opacity: 0.7;
+    opacity: 0.65;
     filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
+  }
+  .cell .risk-corner {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    font-size: clamp(13px, 1.9vw, 18px);
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 4px rgba(0, 0, 0, 0.6);
+    letter-spacing: -0.5px;
+    pointer-events: none;
+    line-height: 1;
+  }
+
+  .cell.bomb-cell {
+    animation: bomb-blast 0.7s ease-out;
+    background: radial-gradient(circle, #ffb347 0%, #ff6020 30%, #6b0000 70%, #1a0000 100%) !important;
+    border-color: #4a0000 !important;
+    z-index: 5;
+  }
+  @keyframes bomb-blast {
+    0%   { transform: scale(1);    filter: brightness(1); box-shadow: 0 0 0 0 rgba(255, 150, 0, 0); }
+    15%  { transform: scale(1.45); filter: brightness(2.8); box-shadow: 0 0 50px 25px rgba(255, 180, 60, 0.85); }
+    35%  { transform: scale(0.92); filter: brightness(0.7); box-shadow: 0 0 30px 10px rgba(255, 80, 0, 0.4); }
+    60%  { transform: scale(1.06); filter: brightness(1.1); box-shadow: 0 0 15px 4px rgba(180, 60, 0, 0.3); }
+    100% { transform: scale(1);    filter: brightness(1); box-shadow: 0 0 0 0 rgba(0,0,0,0); }
+  }
+
+  body.bomb-shake .board {
+    animation: board-shake 0.5s ease-out;
+  }
+  @keyframes board-shake {
+    0%, 100% { transform: translate(0, 0); }
+    15% { transform: translate(-6px, 3px) rotate(-0.5deg); }
+    30% { transform: translate(7px, -3px) rotate(0.6deg); }
+    45% { transform: translate(-5px, -2px) rotate(-0.4deg); }
+    60% { transform: translate(4px, 4px) rotate(0.3deg); }
+    75% { transform: translate(-3px, 2px); }
+    90% { transform: translate(2px, -1px); }
   }
 
   .training-badge {
@@ -1585,6 +1624,8 @@ function setCell(r, c, val) {
 
   if (val === 'bomb') {
     showToast('💥 Бомба! Игра окончена — сохранено в лог.');
+    document.body.classList.add('bomb-shake');
+    setTimeout(() => document.body.classList.remove('bomb-shake'), 600);
     finalizeGame('bomb');
     state.moves = [];
     state.gameStart = null;
@@ -1955,6 +1996,7 @@ function renderBoard() {
 
       if (val !== null) {
         cell.classList.add('revealed');
+        if (val === 'bomb') cell.classList.add('bomb-cell');
         cell.appendChild(renderIcon(val));
       } else if (showTruthCorner) {
         const t = state.truth[r][c];
@@ -1963,6 +2005,13 @@ function renderBoard() {
         const ico = renderIcon(tv);
         ico.classList.add('truth-corner');
         cell.appendChild(ico);
+        const pr = state.probs[`${r},${c}`];
+        if (pr) {
+          const corner = document.createElement('span');
+          corner.className = 'risk-corner';
+          corner.textContent = Math.round(pr.pBomb * 100) + '%';
+          cell.appendChild(corner);
+        }
       } else if (state.showHints) {
         const pr = state.probs[`${r},${c}`];
         if (pr !== undefined) {
@@ -2023,12 +2072,6 @@ function renderBoard() {
             }
             bombEl.appendChild(document.createTextNode(Math.round(pb * 100) + '%'));
             wrap.appendChild(bombEl);
-            if (cfg.rupoors > 0) {
-              const ruEl = document.createElement('span');
-              ruEl.className = 'p-rupoor';
-              ruEl.textContent = Math.round(pr.pRupoor * 100) + '%';
-              wrap.appendChild(ruEl);
-            }
             cell.appendChild(wrap);
           } else {
             // No info — brown bg, prominent ?, dimmed % below
