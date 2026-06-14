@@ -990,6 +990,8 @@
       <h2 data-i18n="controls">Управление</h2>
       <div class="action-row">
         <button class="btn primary" id="reset-btn" data-i18n="reset">Сбросить</button>
+        <button class="btn" id="share-btn" data-i18n-title="shareLink" title="Скопировать ссылку">🔗</button>
+        <button class="btn" id="mute-btn" data-i18n-title="muteToggle" title="Звук">🔊</button>
       </div>
       <div class="toggle on" id="hints-toggle">
         <span data-i18n="solverHints">Подсказки солвера</span>
@@ -1185,6 +1187,11 @@ const I18N = {
     reset: 'Сбросить',
     solverHints: 'Подсказки солвера',
     gameMode: '🎮 Игровой режим',
+    shareLink: 'Скопировать ссылку',
+    muteToggle: 'Звук',
+    linkCopied: '✓ Ссылка скопирована',
+    soundOn: 'Звук включён',
+    soundOff: 'Звук выключен',
     stats: 'Статистика',
     score: 'Счёт',
     opened: 'Открыто',
@@ -1224,6 +1231,11 @@ const I18N = {
     reset: 'Reset',
     solverHints: 'Solver hints',
     gameMode: '🎮 Play mode',
+    shareLink: 'Copy link',
+    muteToggle: 'Sound',
+    linkCopied: '✓ Link copied',
+    soundOn: 'Sound on',
+    soundOff: 'Sound off',
     stats: 'Stats',
     score: 'Score',
     opened: 'Opened',
@@ -1339,11 +1351,180 @@ const state = {
   picker: null,
   showHints: true,
   gameMode: false,
+  muted: false,
   truth: null,
   probs: {},
+  frozenProbs: null,
   moves: [],
   gameStart: null
 };
+
+const MUTE_KEY = 'thrillDiggerMuted';
+const MAX_VOLUME = 0.06;
+let audioCtx = null;
+
+function getAudioCtx() {
+  if (audioCtx) return audioCtx;
+  const C = window.AudioContext || window.webkitAudioContext;
+  if (!C) return null;
+  audioCtx = new C();
+  return audioCtx;
+}
+
+function unlockAudio() {
+  const ctx = getAudioCtx();
+  if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+}
+
+const NOTE = {
+  E4: 329.63, G4: 392.00, A4: 440.00, B4: 493.88,
+  C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880.00, B5: 987.77,
+  C6: 1046.50, D6: 1174.66, E6: 1318.51, G6: 1567.98, A6: 1760.00, C7: 2093.00
+};
+
+function playBell(freq, duration, vol = 0.5, startAt = 0) {
+  if (state.muted) return;
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  unlockAudio();
+  const now = ctx.currentTime + startAt;
+  const v = Math.max(0.001, vol * MAX_VOLUME);
+
+  const osc1 = ctx.createOscillator();
+  osc1.type = 'sine';
+  osc1.frequency.setValueAtTime(freq, now);
+  const g1 = ctx.createGain();
+  g1.gain.setValueAtTime(0, now);
+  g1.gain.linearRampToValueAtTime(v, now + 0.006);
+  g1.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  osc1.connect(g1);
+  g1.connect(ctx.destination);
+  osc1.start(now);
+  osc1.stop(now + duration + 0.02);
+
+  const osc2 = ctx.createOscillator();
+  osc2.type = 'sine';
+  osc2.frequency.setValueAtTime(freq * 2.0, now);
+  const g2 = ctx.createGain();
+  g2.gain.setValueAtTime(0, now);
+  g2.gain.linearRampToValueAtTime(v * 0.35, now + 0.004);
+  g2.gain.exponentialRampToValueAtTime(0.0001, now + duration * 0.55);
+  osc2.connect(g2);
+  g2.connect(ctx.destination);
+  osc2.start(now);
+  osc2.stop(now + duration + 0.02);
+
+  const osc3 = ctx.createOscillator();
+  osc3.type = 'triangle';
+  osc3.frequency.setValueAtTime(freq * 3.0, now);
+  const g3 = ctx.createGain();
+  g3.gain.setValueAtTime(0, now);
+  g3.gain.linearRampToValueAtTime(v * 0.12, now + 0.003);
+  g3.gain.exponentialRampToValueAtTime(0.0001, now + duration * 0.3);
+  osc3.connect(g3);
+  g3.connect(ctx.destination);
+  osc3.start(now);
+  osc3.stop(now + duration + 0.02);
+}
+
+function playArpeggio(notes, step, dur, vol) {
+  notes.forEach((f, i) => playBell(f, dur, vol, i * step));
+}
+
+function playRupeeSound(val) {
+  if (val === 'green')      playBell(NOTE.C6, 0.4, 0.55);
+  else if (val === 'blue')  playArpeggio([NOTE.E5, NOTE.B5], 0.075, 0.32, 0.6);
+  else if (val === 'red')   playArpeggio([NOTE.G5, NOTE.C6, NOTE.E6], 0.07, 0.32, 0.7);
+  else if (val === 'silver')playArpeggio([NOTE.E5, NOTE.G5, NOTE.B5, NOTE.E6, NOTE.G6], 0.06, 0.35, 0.8);
+  else if (val === 'gold')  playArpeggio([NOTE.G4, NOTE.C5, NOTE.E5, NOTE.G5, NOTE.C6, NOTE.E6, NOTE.G6, NOTE.C7], 0.055, 0.45, 0.9);
+  else if (val === 'rupoor') {
+    if (state.muted) return;
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    unlockAudio();
+    const now = ctx.currentTime;
+    const v = 0.5 * MAX_VOLUME;
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(180, now);
+    osc.frequency.exponentialRampToValueAtTime(80, now + 0.35);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(v, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(800, now);
+    filter.frequency.exponentialRampToValueAtTime(200, now + 0.35);
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.45);
+  }
+}
+
+function playBombSound() {
+  if (state.muted) return;
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  unlockAudio();
+  const now = ctx.currentTime;
+
+  const crackSize = Math.floor(ctx.sampleRate * 0.04);
+  const crackBuf = ctx.createBuffer(1, crackSize, ctx.sampleRate);
+  const crackData = crackBuf.getChannelData(0);
+  for (let i = 0; i < crackSize; i++) {
+    const decay = Math.pow(1 - i / crackSize, 1.5);
+    crackData[i] = (Math.random() * 2 - 1) * decay;
+  }
+  const crack = ctx.createBufferSource();
+  crack.buffer = crackBuf;
+  const crackHP = ctx.createBiquadFilter();
+  crackHP.type = 'highpass';
+  crackHP.frequency.value = 2000;
+  const crackGain = ctx.createGain();
+  crackGain.gain.setValueAtTime(MAX_VOLUME * 1.3, now);
+  crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+  crack.connect(crackHP);
+  crackHP.connect(crackGain);
+  crackGain.connect(ctx.destination);
+  crack.start(now);
+
+  const boomSize = Math.floor(ctx.sampleRate * 0.9);
+  const boomBuf = ctx.createBuffer(1, boomSize, ctx.sampleRate);
+  const boomData = boomBuf.getChannelData(0);
+  for (let i = 0; i < boomSize; i++) {
+    const decay = Math.pow(1 - i / boomSize, 2.5);
+    boomData[i] = (Math.random() * 2 - 1) * decay;
+  }
+  const boom = ctx.createBufferSource();
+  boom.buffer = boomBuf;
+  const boomLP = ctx.createBiquadFilter();
+  boomLP.type = 'lowpass';
+  boomLP.frequency.setValueAtTime(700, now);
+  boomLP.frequency.exponentialRampToValueAtTime(80, now + 0.7);
+  const boomGain = ctx.createGain();
+  boomGain.gain.setValueAtTime(0, now);
+  boomGain.gain.linearRampToValueAtTime(MAX_VOLUME * 1.5, now + 0.02);
+  boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+  boom.connect(boomLP);
+  boomLP.connect(boomGain);
+  boomGain.connect(ctx.destination);
+  boom.start(now);
+
+  const thump = ctx.createOscillator();
+  thump.type = 'sine';
+  thump.frequency.setValueAtTime(120, now);
+  thump.frequency.exponentialRampToValueAtTime(35, now + 0.3);
+  const thumpGain = ctx.createGain();
+  thumpGain.gain.setValueAtTime(MAX_VOLUME * 1.6, now);
+  thumpGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+  thump.connect(thumpGain);
+  thumpGain.connect(ctx.destination);
+  thump.start(now);
+  thump.stop(now + 0.5);
+}
 
 const LOG_KEY = 'thrillDiggerLog';
 const CURRENT_KEY = 'thrillDiggerCurrent';
@@ -1415,6 +1596,50 @@ function colorFromTruth(r, c) {
   return 'gold';
 }
 
+function readURLParams() {
+  try {
+    const p = new URLSearchParams(window.location.search);
+    return { mode: p.get('mode'), difficulty: p.get('difficulty'), lang: p.get('lang') };
+  } catch { return {}; }
+}
+
+function syncURL() {
+  try {
+    const p = new URLSearchParams();
+    if (state.gameMode) p.set('mode', 'play');
+    if (state.difficulty !== 'beginner') p.set('difficulty', state.difficulty);
+    p.set('lang', currentLang);
+    const qs = p.toString();
+    const next = window.location.pathname + (qs ? '?' + qs : '');
+    if (next !== window.location.pathname + window.location.search) {
+      window.history.replaceState(null, '', next);
+    }
+  } catch {}
+}
+
+async function shareLink() {
+  syncURL();
+  const url = window.location.href;
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast(I18N[currentLang].linkCopied);
+  } catch {
+    try {
+      const area = document.createElement('textarea');
+      area.value = url;
+      area.style.position = 'fixed';
+      area.style.left = '-9999px';
+      document.body.appendChild(area);
+      area.select();
+      document.execCommand('copy');
+      document.body.removeChild(area);
+      showToast(I18N[currentLang].linkCopied);
+    } catch {
+      prompt(I18N[currentLang].shareLink + ':', url);
+    }
+  }
+}
+
 function clearCurrentGame() {
   try { localStorage.removeItem(CURRENT_KEY); } catch {}
 }
@@ -1423,17 +1648,39 @@ function clearCurrentGame() {
 // INIT
 //=============================================================
 function init() {
-  applyLang(detectLang());
+  const urlParams = readURLParams();
+  applyLang(urlParams.lang && I18N[urlParams.lang] ? urlParams.lang : detectLang());
   document.querySelectorAll('.lang-switch button').forEach(b => {
     b.addEventListener('click', () => {
       applyLang(b.dataset.lang);
       updateLogUI();
+      syncURL();
     });
   });
   setupDifficulty();
   setupActions();
   setupPicker();
   setupKeyboard();
+
+  const wantsPlay = urlParams.mode === 'play';
+  const wantsDiff = urlParams.difficulty && DIFFICULTIES[urlParams.difficulty]
+    ? urlParams.difficulty : null;
+
+  if (wantsPlay || wantsDiff) {
+    state.difficulty = wantsDiff || state.difficulty || 'beginner';
+    document.querySelectorAll('.diff-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.diff === state.difficulty);
+    });
+    if (wantsPlay) {
+      state.gameMode = true;
+      document.getElementById('game-toggle').classList.add('on');
+      document.body.classList.add('play-mode');
+      state.truth = generateTruth(state.difficulty);
+    }
+    resetBoard();
+    syncURL();
+    return;
+  }
 
   const saved = loadCurrentGame();
   if (saved && DIFFICULTIES[saved.difficulty] && Array.isArray(saved.board)) {
@@ -1449,6 +1696,7 @@ function init() {
   } else {
     selectDifficulty('beginner');
   }
+  syncURL();
 }
 
 function setupDifficulty() {
@@ -1485,7 +1733,28 @@ function setupActions() {
       state.truth = null;
       resetBoard();
     }
+    syncURL();
   });
+
+  document.getElementById('share-btn').addEventListener('click', shareLink);
+
+  const muteBtn = document.getElementById('mute-btn');
+  function updateMuteUI() {
+    muteBtn.textContent = state.muted ? '🔇' : '🔊';
+    muteBtn.title = state.muted
+      ? I18N[currentLang].soundOff
+      : I18N[currentLang].soundOn;
+  }
+  muteBtn.addEventListener('click', () => {
+    state.muted = !state.muted;
+    try { localStorage.setItem(MUTE_KEY, state.muted ? '1' : '0'); } catch {}
+    updateMuteUI();
+    if (!state.muted) unlockAudio();
+  });
+  try {
+    state.muted = localStorage.getItem(MUTE_KEY) === '1';
+  } catch {}
+  updateMuteUI();
 
   document.getElementById('copy-log-btn').addEventListener('click', copyLogToClipboard);
   document.getElementById('paste-log-btn').addEventListener('click', pasteLogFromClipboard);
@@ -1536,6 +1805,7 @@ function selectDifficulty(diff) {
   });
   resetBoard();
   saveCurrentGame();
+  syncURL();
 }
 
 function resetBoard() {
@@ -1543,6 +1813,7 @@ function resetBoard() {
   state.board = Array.from({ length: cfg.rows },
     () => Array.from({ length: cfg.cols }, () => null));
   state.probs = {};
+  state.frozenProbs = null;
   state.moves = [];
   state.gameStart = null;
   if (state.gameMode) state.truth = generateTruth(state.difficulty);
@@ -1594,8 +1865,12 @@ function closePicker() {
 //=============================================================
 function setCell(r, c, val) {
   const prev = state.board[r][c];
-  // Game already over → review mode: just update board, no log writes, no finalize
   const reviewMode = isGameOver();
+
+  if (!reviewMode && val === 'bomb' && prev !== 'bomb' && !state.frozenProbs) {
+    state.frozenProbs = state.probs;
+  }
+
   state.board[r][c] = val;
 
   if (reviewMode) {
@@ -1626,10 +1901,13 @@ function setCell(r, c, val) {
     showToast('💥 Бомба! Игра окончена — сохранено в лог.');
     document.body.classList.add('bomb-shake');
     setTimeout(() => document.body.classList.remove('bomb-shake'), 600);
+    playBombSound();
     finalizeGame('bomb');
     state.moves = [];
     state.gameStart = null;
     updateLogUI();
+  } else if (val !== null && val !== prev) {
+    playRupeeSound(val);
   }
   saveCurrentGame();
 }
@@ -2437,6 +2715,14 @@ function solve() {
 // RECOMPUTE & STATS
 //=============================================================
 function recomputeAndRender() {
+  if (state.frozenProbs && isGameOver()) {
+    state.probs = state.frozenProbs;
+    updateAdvice();
+    updateStats();
+    renderBoard();
+    return;
+  }
+
   let result;
   try {
     result = solve();
