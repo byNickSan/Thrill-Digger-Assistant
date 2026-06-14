@@ -2341,6 +2341,7 @@ const REWARD = {
 function triggerVictory() {
   state.won = true;
   state.frozenProbs = state.probs;
+  const finalScore = computeScore();
   finalizeGame('victory');
   state.moves = [];
   state.gameStart = null;
@@ -2352,7 +2353,7 @@ function triggerVictory() {
     if (useEl) useEl.setAttribute('href', reward.symbol);
     const nameEl = document.getElementById('victory-reward-name');
     if (nameEl) nameEl.textContent = I18N[currentLang][reward.key] || '';
-    document.getElementById('victory-score-val').textContent = computeScore();
+    document.getElementById('victory-score-val').textContent = finalScore;
     overlay.classList.add('show');
   }
   playVictorySound();
