@@ -2238,27 +2238,34 @@ function setCell(r, c, val) {
     state.moves = state.moves.filter(m => !(m.r === r && m.c === c));
   }
 
-  renderBoard();
-  recomputeAndRender();
-
   if (val === 'bomb') {
     showToast('💥 Бомба! Игра окончена — сохранено в лог.');
     document.body.classList.add('bomb-shake');
     setTimeout(() => document.body.classList.remove('bomb-shake'), 600);
     playBombSound();
-    finalizeGame('bomb');
-    state.moves = [];
-    state.gameStart = null;
-    updateLogUI();
   } else if (val !== null && val !== prev) {
     playRupeeSound(val);
   }
 
-  if (val !== 'bomb' && checkWin()) {
-    triggerVictory();
-  }
+  renderBoard();
 
-  saveCurrentGame();
+  const finish = () => {
+    recomputeAndRender();
+    if (val === 'bomb') {
+      finalizeGame('bomb');
+      state.moves = [];
+      state.gameStart = null;
+      updateLogUI();
+    }
+    if (val !== 'bomb' && checkWin()) triggerVictory();
+    saveCurrentGame();
+  };
+
+  if (state.safeMode) {
+    setTimeout(finish, 0);
+  } else {
+    finish();
+  }
 }
 
 function computeScore() {
@@ -2532,7 +2539,7 @@ function findCandidates() {
   scored.sort((a, b) => a.u - b.u);
 
   if (state.safeMode) {
-    const topN = Math.min(8, scored.length);
+    const topN = Math.min(4, scored.length);
     let bestIdx = 0, bestRisk = Infinity;
     for (let i = 0; i < topN; i++) {
       const cell = scored[i];
