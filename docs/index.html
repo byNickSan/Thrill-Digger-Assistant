@@ -465,11 +465,20 @@
     h1 { font-size: 20px; }
     .calm-note { font-size: 11px; padding: 8px 10px; }
 
-    .board { padding: 6px; gap: 3px; border-radius: 8px; }
+    .board {
+      padding: 6px;
+      gap: 3px;
+      border-radius: 8px;
+      width: 100%;
+      max-width: 100%;
+      grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr)) !important;
+      box-sizing: border-box;
+    }
+    .board-wrap { align-self: stretch; width: 100%; }
     .cell {
-      width: calc((100vw - 16px - 3px * var(--gap-count) - 12px) / var(--cols));
-      min-width: 32px;
-      max-width: 72px;
+      width: 100%;
+      min-width: 0;
+      max-width: none;
       border-width: 1.5px;
       border-radius: 5px;
     }
@@ -538,7 +547,7 @@
 
   @media (max-width: 380px) {
     body { padding: 6px 4px calc(36px + env(safe-area-inset-bottom)); }
-    .cell { min-width: 28px; }
+    .board { padding: 4px; gap: 2px; }
     .cell .p-bomb { font-size: 11px; }
     .cell .p-rupoor { font-size: 8px; }
     .advice-item { min-width: 44px; }
