@@ -229,6 +229,117 @@
     100% { transform: scale(1);    filter: brightness(1); box-shadow: 0 0 0 0 rgba(0,0,0,0); }
   }
 
+  .victory-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(60, 110, 180, 0.45) 0%, rgba(5, 10, 25, 0.92) 70%);
+    backdrop-filter: blur(4px);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    animation: victory-fade 0.5s ease-out;
+  }
+  .victory-overlay.show { display: flex; }
+  @keyframes victory-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .victory-card {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    padding: 36px 44px;
+    background: linear-gradient(180deg, #1c3258, #0c1c38);
+    border: 2px solid #5ba3e8;
+    border-radius: 16px;
+    box-shadow:
+      0 0 60px rgba(91, 163, 232, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    max-width: 90vw;
+    animation: victory-pop 0.6s cubic-bezier(0.16, 1.2, 0.4, 1);
+  }
+  @keyframes victory-pop {
+    from { transform: scale(0.6); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  .victory-card .feather {
+    width: clamp(100px, 18vw, 150px);
+    height: clamp(140px, 25vw, 210px);
+    animation: feather-float 2.4s ease-in-out infinite;
+    filter: drop-shadow(0 0 18px rgba(120, 200, 255, 0.7));
+  }
+  @keyframes feather-float {
+    0%, 100% { transform: translateY(0) rotate(-2deg); }
+    50%      { transform: translateY(-8px) rotate(2deg); }
+  }
+  .victory-card h2 {
+    margin-top: 10px;
+    color: #e5f1ff;
+    font-size: clamp(28px, 4vw, 42px);
+    font-style: italic;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7), 0 0 20px rgba(120, 200, 255, 0.6);
+    font-family: "Trebuchet MS", Georgia, serif;
+  }
+  .victory-card .victory-sub {
+    color: #9fc4e8;
+    font-size: 14px;
+    margin-top: 4px;
+    font-style: italic;
+  }
+  .victory-card .victory-reward {
+    color: #f5e6a0;
+    font-size: 18px;
+    font-weight: 800;
+    margin-top: 10px;
+    margin-bottom: 14px;
+    letter-spacing: 0.5px;
+    text-shadow: 0 0 10px rgba(245, 230, 160, 0.5);
+  }
+  .victory-card .victory-score {
+    color: var(--gold);
+    font-size: 22px;
+    font-weight: 800;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .victory-card .victory-score span:first-child {
+    color: #9fc4e8;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+  }
+  .victory-card .victory-score #victory-score-val {
+    font-size: 36px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+  }
+  .victory-close { min-width: 140px; }
+
+  .victory-stars {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(circle at 15% 25%, rgba(180, 220, 255, 0.8) 0px, transparent 2px),
+      radial-gradient(circle at 80% 15%, rgba(180, 220, 255, 0.6) 0px, transparent 2px),
+      radial-gradient(circle at 25% 70%, rgba(180, 220, 255, 0.7) 0px, transparent 2px),
+      radial-gradient(circle at 70% 80%, rgba(180, 220, 255, 0.5) 0px, transparent 2px),
+      radial-gradient(circle at 90% 45%, rgba(180, 220, 255, 0.6) 0px, transparent 2px),
+      radial-gradient(circle at 10% 55%, rgba(180, 220, 255, 0.5) 0px, transparent 2px),
+      radial-gradient(circle at 50% 30%, rgba(180, 220, 255, 0.6) 0px, transparent 1.5px);
+    animation: twinkle 2.5s ease-in-out infinite;
+  }
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+  }
+
   body.bomb-shake .board {
     animation: board-shake 0.5s ease-out;
   }
@@ -958,6 +1069,75 @@
       <path d="M50 18 Q 60 8, 70 14 Q 64 20, 56 16" fill="#f0a040"/>
       <circle cx="68" cy="14" r="4" fill="#ffcc44"/>
     </symbol>
+    <symbol id="plume" viewBox="0 0 100 140">
+      <defs>
+        <linearGradient id="plumeG" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#9c7a1c"/>
+          <stop offset="45%" stop-color="#f5e6a0"/>
+          <stop offset="55%" stop-color="#fff8d0"/>
+          <stop offset="100%" stop-color="#9c7a1c"/>
+        </linearGradient>
+      </defs>
+      <path d="M 50 4 C 22 16, 14 42, 18 76 C 22 108, 32 128, 50 138 C 68 128, 78 108, 82 76 C 86 42, 78 16, 50 4 Z"
+            fill="url(#plumeG)" stroke="#6a4f08" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M 50 10 L 50 135" stroke="#6a4f08" stroke-width="2.2" stroke-linecap="round"/>
+      <g stroke="#7a5e10" stroke-width="1" opacity="0.55" fill="none" stroke-linecap="round">
+        <path d="M 50 20 Q 34 23 24 30"/><path d="M 50 20 Q 66 23 76 30"/>
+        <path d="M 50 38 Q 28 42 18 52"/><path d="M 50 38 Q 72 42 82 52"/>
+        <path d="M 50 58 Q 24 62 16 76"/><path d="M 50 58 Q 76 62 84 76"/>
+        <path d="M 50 80 Q 26 86 20 100"/><path d="M 50 80 Q 74 86 80 100"/>
+        <path d="M 50 100 Q 32 110 28 122"/><path d="M 50 100 Q 68 110 72 122"/>
+      </g>
+      <path d="M 44 16 C 36 28, 32 50, 34 80 C 36 108, 42 124, 48 134"
+            fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="2.5" stroke-linecap="round"/>
+    </symbol>
+
+    <symbol id="skull" viewBox="0 0 100 140">
+      <defs>
+        <linearGradient id="skullG" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#fde072"/>
+          <stop offset="50%" stop-color="#d4a020"/>
+          <stop offset="100%" stop-color="#8a6010"/>
+        </linearGradient>
+      </defs>
+      <path d="M 25 35 C 25 18, 40 12, 50 12 C 60 12, 75 18, 75 35
+               C 78 50, 82 65, 78 80 L 70 88 L 70 100 L 30 100 L 30 88 L 22 80
+               C 18 65, 22 50, 25 35 Z"
+            fill="url(#skullG)" stroke="#3a2400" stroke-width="2.5" stroke-linejoin="round"/>
+      <ellipse cx="36" cy="52" rx="9" ry="11" fill="#1a0c00"/>
+      <ellipse cx="64" cy="52" rx="9" ry="11" fill="#1a0c00"/>
+      <ellipse cx="33" cy="49" rx="2" ry="3" fill="rgba(255,255,255,0.4)"/>
+      <ellipse cx="61" cy="49" rx="2" ry="3" fill="rgba(255,255,255,0.4)"/>
+      <path d="M 47 68 L 44 80 L 50 84 L 56 80 L 53 68 Z" fill="#1a0c00"/>
+      <path d="M 30 100 L 32 116 L 40 122 L 44 116 L 44 124 L 50 130 L 56 124 L 56 116 L 60 122 L 68 116 L 70 100 Z"
+            fill="url(#skullG)" stroke="#3a2400" stroke-width="2" stroke-linejoin="round"/>
+      <line x1="40" y1="102" x2="40" y2="118" stroke="#3a2400" stroke-width="1.4"/>
+      <line x1="50" y1="103" x2="50" y2="125" stroke="#3a2400" stroke-width="1.4"/>
+      <line x1="60" y1="102" x2="60" y2="118" stroke="#3a2400" stroke-width="1.4"/>
+    </symbol>
+
+    <symbol id="feather" viewBox="0 0 100 140">
+      <defs>
+        <linearGradient id="featherG" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#1e4380"/>
+          <stop offset="45%" stop-color="#5ba3e8"/>
+          <stop offset="55%" stop-color="#7cc0ff"/>
+          <stop offset="100%" stop-color="#1e4380"/>
+        </linearGradient>
+      </defs>
+      <path d="M 50 5 C 26 18, 18 45, 20 75 C 22 105, 32 125, 50 138 C 68 125, 78 105, 80 75 C 82 45, 74 18, 50 5 Z"
+            fill="url(#featherG)" stroke="#0e2a55" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M 50 12 L 50 135" stroke="#0e2a55" stroke-width="2.2" stroke-linecap="round"/>
+      <g stroke="#2b5fa3" stroke-width="1" opacity="0.55" fill="none" stroke-linecap="round">
+        <path d="M 50 22 Q 36 25 28 32"/><path d="M 50 22 Q 64 25 72 32"/>
+        <path d="M 50 38 Q 32 42 24 52"/><path d="M 50 38 Q 68 42 76 52"/>
+        <path d="M 50 56 Q 28 62 22 75"/><path d="M 50 56 Q 72 62 78 75"/>
+        <path d="M 50 76 Q 30 82 26 95"/><path d="M 50 76 Q 70 82 74 95"/>
+        <path d="M 50 96 Q 36 104 32 116"/><path d="M 50 96 Q 64 104 68 116"/>
+      </g>
+      <path d="M 44 18 C 36 28, 32 50, 34 80 C 36 105, 42 122, 48 132"
+            fill="none" stroke="rgba(255,255,255,0.45)" stroke-width="2.5" stroke-linecap="round"/>
+    </symbol>
     <!-- Rupoor (dark hexagonal gem, no cross) -->
     <symbol id="rupoor" viewBox="0 0 100 100">
       <polygon points="50,4 80,25 80,75 50,96 20,75 20,25"
@@ -1174,6 +1354,21 @@
 
 <div class="toast" id="toast"></div>
 
+<div class="victory-overlay" id="victory-overlay">
+  <div class="victory-stars"></div>
+  <div class="victory-card">
+    <svg class="feather"><use href="#feather"/></svg>
+    <h2 data-i18n="victoryTitle">Победа!</h2>
+    <div class="victory-sub" data-i18n="victorySub">Все безопасные клетки найдены</div>
+    <div class="victory-reward" id="victory-reward-name"></div>
+    <div class="victory-score">
+      <span data-i18n="finalScore">Итог</span>
+      <span id="victory-score-val">0</span>
+    </div>
+    <button class="btn primary victory-close" id="victory-close" data-i18n="continue">Продолжить</button>
+  </div>
+</div>
+
 <script>
 //=============================================================
 // CONSTANTS
@@ -1192,6 +1387,13 @@ const I18N = {
     linkCopied: '✓ Ссылка скопирована',
     soundOn: 'Звук включён',
     soundOff: 'Звук выключен',
+    victoryTitle: 'Победа!',
+    victorySub: 'Все безопасные клетки найдены',
+    finalScore: 'Итог',
+    continue: 'Продолжить',
+    rewardPlume: 'Перо богини',
+    rewardSkull: 'Золотой череп',
+    rewardFeather: 'Синее перо',
     stats: 'Статистика',
     score: 'Счёт',
     opened: 'Открыто',
@@ -1236,6 +1438,13 @@ const I18N = {
     linkCopied: '✓ Link copied',
     soundOn: 'Sound on',
     soundOff: 'Sound off',
+    victoryTitle: 'Victory!',
+    victorySub: 'All safe cells revealed',
+    finalScore: 'Score',
+    continue: 'Continue',
+    rewardPlume: 'Goddess Plume',
+    rewardSkull: 'Golden Skull',
+    rewardFeather: 'Blue Bird Feather',
     stats: 'Stats',
     score: 'Score',
     opened: 'Opened',
@@ -1355,6 +1564,7 @@ const state = {
   truth: null,
   probs: {},
   frozenProbs: null,
+  won: false,
   moves: [],
   gameStart: null
 };
@@ -1755,6 +1965,10 @@ function setupActions() {
 
   document.getElementById('share-btn').addEventListener('click', shareLink);
 
+  document.getElementById('victory-close').addEventListener('click', () => {
+    document.getElementById('victory-overlay').classList.remove('show');
+  });
+
   const muteBtn = document.getElementById('mute-btn');
   function updateMuteUI() {
     muteBtn.textContent = state.muted ? '🔇' : '🔊';
@@ -1831,9 +2045,12 @@ function resetBoard() {
     () => Array.from({ length: cfg.cols }, () => null));
   state.probs = {};
   state.frozenProbs = null;
+  state.won = false;
   state.moves = [];
   state.gameStart = null;
   if (state.gameMode) state.truth = generateTruth(state.difficulty);
+  const overlay = document.getElementById('victory-overlay');
+  if (overlay) overlay.classList.remove('show');
   clearCurrentGame();
   closePicker();
   renderBoard();
@@ -1926,6 +2143,11 @@ function setCell(r, c, val) {
   } else if (val !== null && val !== prev) {
     playRupeeSound(val);
   }
+
+  if (val !== 'bomb' && checkWin()) {
+    triggerVictory();
+  }
+
   saveCurrentGame();
 }
 
@@ -2078,11 +2300,63 @@ async function copyLogToClipboard() {
 // RENDER BOARD
 //=============================================================
 function isGameOver() {
+  if (state.won) return true;
   const cfg = DIFFICULTIES[state.difficulty];
   for (let r = 0; r < cfg.rows; r++)
     for (let c = 0; c < cfg.cols; c++)
       if (state.board[r][c] === 'bomb') return true;
   return false;
+}
+
+function checkWin() {
+  if (state.won) return false;
+  const cfg = DIFFICULTIES[state.difficulty];
+  const totalHazards = cfg.bombs + cfg.rupoors;
+  let foundHazards = 0, unrevealed = 0, bombSeen = false;
+  for (let r = 0; r < cfg.rows; r++) {
+    for (let c = 0; c < cfg.cols; c++) {
+      const v = state.board[r][c];
+      if (v === 'bomb') { bombSeen = true; foundHazards++; }
+      else if (v === 'rupoor') foundHazards++;
+      else if (v === null) unrevealed++;
+    }
+  }
+  if (bombSeen) return false;
+  return unrevealed > 0 && (totalHazards - foundHazards) === unrevealed;
+}
+
+function playVictorySound() {
+  playArpeggio(
+    [NOTE.C5, NOTE.E5, NOTE.G5, NOTE.C6, NOTE.E6, NOTE.G6, NOTE.C7],
+    0.08, 0.55, 0.85
+  );
+}
+
+const REWARD = {
+  beginner:     { symbol: '#plume',   key: 'rewardPlume'   },
+  intermediate: { symbol: '#skull',   key: 'rewardSkull'   },
+  expert:       { symbol: '#feather', key: 'rewardFeather' }
+};
+
+function triggerVictory() {
+  state.won = true;
+  state.frozenProbs = state.probs;
+  finalizeGame('victory');
+  state.moves = [];
+  state.gameStart = null;
+  updateLogUI();
+  const overlay = document.getElementById('victory-overlay');
+  if (overlay) {
+    const reward = REWARD[state.difficulty] || REWARD.beginner;
+    const useEl = overlay.querySelector('.feather use');
+    if (useEl) useEl.setAttribute('href', reward.symbol);
+    const nameEl = document.getElementById('victory-reward-name');
+    if (nameEl) nameEl.textContent = I18N[currentLang][reward.key] || '';
+    document.getElementById('victory-score-val').textContent = computeScore();
+    overlay.classList.add('show');
+  }
+  playVictorySound();
+  renderBoard();
 }
 
 // Strategy: global min pHaz, no spatial bias.
