@@ -1181,6 +1181,10 @@
         <span data-i18n="gameMode">🎮 Игровой режим</span>
         <span class="switch"></span>
       </div>
+      <div class="toggle" id="strategy-toggle">
+        <span data-i18n="strategySafe">🛡️ Безопасная игра</span>
+        <span class="switch"></span>
+      </div>
 
       <h2 style="margin-top:14px" data-i18n="stats">Статистика</h2>
       <div class="stats">
@@ -1382,6 +1386,7 @@ const I18N = {
     reset: 'Сбросить',
     solverHints: 'Подсказки солвера',
     gameMode: '🎮 Игровой режим',
+    strategySafe: '🛡️ Безопасная игра',
     shareLink: 'Скопировать ссылку',
     muteToggle: 'Звук',
     linkCopied: '✓ Ссылка скопирована',
@@ -1433,6 +1438,7 @@ const I18N = {
     reset: 'Reset',
     solverHints: 'Solver hints',
     gameMode: '🎮 Play mode',
+    strategySafe: '🛡️ Safe play',
     shareLink: 'Copy link',
     muteToggle: 'Sound',
     linkCopied: '✓ Link copied',
@@ -1560,6 +1566,7 @@ const state = {
   picker: null,
   showHints: true,
   gameMode: false,
+  safeMode: false,
   muted: false,
   truth: null,
   probs: {},
@@ -1962,6 +1969,18 @@ function setupActions() {
     }
     syncURL();
   });
+
+  const strategyToggle = document.getElementById('strategy-toggle');
+  strategyToggle.addEventListener('click', () => {
+    state.safeMode = !state.safeMode;
+    strategyToggle.classList.toggle('on', state.safeMode);
+    try { localStorage.setItem('thrillDiggerSafeMode', state.safeMode ? '1' : '0'); } catch {}
+    recomputeAndRender();
+  });
+  try {
+    state.safeMode = localStorage.getItem('thrillDiggerSafeMode') === '1';
+    strategyToggle.classList.toggle('on', state.safeMode);
+  } catch {}
 
   document.getElementById('share-btn').addEventListener('click', shareLink);
 
@@ -2369,6 +2388,37 @@ function triggerVictory() {
 const SUGGEST_CEILING = 0.20;
 const HIGHLIGHT_TOLERANCE = 0.03;
 
+function entropyScore(r, c, cfg) {
+  let expH = 0, k = 0;
+  for (const [nr, nc] of getNeighbors(r, c, cfg)) {
+    if (state.board[nr][nc] === null) {
+      const np = state.probs[`${nr},${nc}`];
+      if (np) { expH += np.pHaz; k++; }
+    }
+  }
+  if (k === 0) return 0;
+  const ratio = expH / k;
+  return 1 - Math.abs(ratio - 0.5) * 2;
+}
+
+function predictedColor(r, c, cfg) {
+  let exp = 0;
+  for (const [nr, nc] of getNeighbors(r, c, cfg)) {
+    const v = state.board[nr][nc];
+    if (v === 'bomb' || v === 'rupoor') exp++;
+    else if (v === null) {
+      const np = state.probs[`${nr},${nc}`];
+      if (np) exp += np.pHaz;
+    }
+  }
+  const k = Math.round(exp);
+  if (k === 0) return 'green';
+  if (k <= 2) return 'blue';
+  if (k <= 4) return 'red';
+  if (k <= 6) return 'silver';
+  return 'gold';
+}
+
 function findCandidates() {
   const cfg = DIFFICULTIES[state.difficulty];
 
@@ -2381,13 +2431,43 @@ function findCandidates() {
       let unrev = 0;
       for (const [nr, nc] of getNeighbors(r, c, cfg))
         if (state.board[nr][nc] === null) unrev++;
-      const u = p.pHaz - 0.020 * unrev;
-      scored.push({ r, c, p, unrev, u });
+      const ent = entropyScore(r, c, cfg);
+      const u = p.pHaz - 0.020 * unrev - 0.05 * ent * unrev;
+      scored.push({ r, c, p, unrev, ent, u });
     }
   }
   if (scored.length === 0) return { ranks: new Map(), bestEv: null, bestP: null };
 
   scored.sort((a, b) => a.u - b.u);
+
+  if (state.safeMode) {
+    const topN = Math.min(8, scored.length);
+    let bestIdx = 0, bestRisk = Infinity;
+    for (let i = 0; i < topN; i++) {
+      const cell = scored[i];
+      if (cell.p.pHaz >= 0.99) continue;
+      const color = predictedColor(cell.r, cell.c, cfg);
+      const savedVal = state.board[cell.r][cell.c];
+      state.board[cell.r][cell.c] = color;
+      let nextMin = 1;
+      try {
+        const np = solve();
+        if (np && np.probs) {
+          for (const k in np.probs) {
+            if (np.probs[k].pHaz < nextMin) nextMin = np.probs[k].pHaz;
+          }
+        }
+      } catch (_) {}
+      state.board[cell.r][cell.c] = savedVal;
+      const combined = cell.p.pHaz + (1 - cell.p.pHaz) * nextMin;
+      if (combined < bestRisk) { bestRisk = combined; bestIdx = i; }
+    }
+    if (bestIdx !== 0) {
+      const [picked] = scored.splice(bestIdx, 1);
+      scored.unshift(picked);
+    }
+  }
+
   const bestP = scored[0].p;
 
   const ranks = new Map();
