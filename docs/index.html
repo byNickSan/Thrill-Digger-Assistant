@@ -1122,6 +1122,43 @@
   }
   .toast.show { opacity: 1; }
 
+  body.computing,
+  body.computing .cell,
+  body.computing .board { cursor: progress; }
+  body.computing .cell { pointer-events: none; }
+
+  .compute-spinner {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 38px;
+    height: 38px;
+    margin: -19px 0 0 -19px;
+    border: 3px solid rgba(224, 177, 74, 0.2);
+    border-top-color: var(--gold);
+    border-right-color: var(--gold);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 80;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    background: rgba(20, 16, 12, 0.85);
+    animation: spinner-rotate 0.7s linear infinite;
+  }
+  body.computing .compute-spinner { display: block; }
+  @keyframes spinner-rotate {
+    to { transform: rotate(360deg); }
+  }
+
+  @media (hover: none) {
+    .compute-spinner {
+      width: 46px;
+      height: 46px;
+      margin: -23px 0 0 -23px;
+      border-width: 4px;
+    }
+  }
+
   .footer-note {
     color: var(--muted);
     font-size: 12px;
@@ -1448,6 +1485,7 @@
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="compute-spinner" id="compute-spinner"></div>
 
 <div class="victory-overlay" id="victory-overlay">
   <div class="victory-stars"></div>
@@ -2262,7 +2300,13 @@ function setCell(r, c, val) {
   };
 
   if (state.safeMode) {
-    setTimeout(finish, 0);
+    document.body.classList.add('computing');
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        finish();
+        document.body.classList.remove('computing');
+      }, 0);
+    });
   } else {
     finish();
   }
