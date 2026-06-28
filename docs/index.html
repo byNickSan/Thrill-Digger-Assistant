@@ -2515,12 +2515,16 @@ function findCandidates() {
   }
   if (scored.length === 0) return { ranks: new Map(), bestEv: null, bestP: null };
 
-  // First move: max-neighbor cell (center bias). Empirically corners lose −12 vs center.
+  // First move: all max-neighbor cells equally good (corners empirically lose −12).
   if (!anyOpened) {
     scored.sort((a, b) => b.nbrCount - a.nbrCount);
-    const bestP = scored[0].p;
+    const maxN = scored[0].nbrCount;
     const ranks = new Map();
-    ranks.set(`${scored[0].r},${scored[0].c}`, 1);
+    for (const s of scored) {
+      if (s.nbrCount === maxN) ranks.set(`${s.r},${s.c}`, 1);
+      else break;
+    }
+    const bestP = scored[0].p;
     const score = computeScore();
     const avgRupee = getAvgRupee();
     const rupoorLoss = Math.min(score, 10);
