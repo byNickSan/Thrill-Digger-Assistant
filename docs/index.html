@@ -1131,43 +1131,6 @@
   }
   .toast.show { opacity: 1; }
 
-  body.computing,
-  body.computing .cell,
-  body.computing .board { cursor: progress; }
-  body.computing .cell { pointer-events: none; }
-
-  .compute-spinner {
-    display: none;
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    width: 38px;
-    height: 38px;
-    margin: -19px 0 0 -19px;
-    border: 3px solid rgba(224, 177, 74, 0.2);
-    border-top-color: var(--gold);
-    border-right-color: var(--gold);
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 80;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-    background: rgba(20, 16, 12, 0.85);
-    animation: spinner-rotate 0.7s linear infinite;
-  }
-  body.computing .compute-spinner { display: block; }
-  @keyframes spinner-rotate {
-    to { transform: rotate(360deg); }
-  }
-
-  @media (hover: none) {
-    .compute-spinner {
-      width: 46px;
-      height: 46px;
-      margin: -23px 0 0 -23px;
-      border-width: 4px;
-    }
-  }
-
   .footer-note {
     color: var(--muted);
     font-size: 12px;
@@ -1316,10 +1279,6 @@
       </div>
       <div class="toggle" id="game-toggle">
         <span data-i18n="gameMode">🎮 Игровой режим</span>
-        <span class="switch"></span>
-      </div>
-      <div class="toggle" id="strategy-toggle">
-        <span data-i18n="strategySafe">🛡️ Безопасная игра</span>
         <span class="switch"></span>
       </div>
 
@@ -1494,7 +1453,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="compute-spinner" id="compute-spinner"></div>
 
 <div class="victory-overlay" id="victory-overlay">
   <div class="victory-stars"></div>
@@ -1524,7 +1482,6 @@ const I18N = {
     reset: 'Сбросить',
     solverHints: 'Подсказки солвера',
     gameMode: '🎮 Игровой режим',
-    strategySafe: '🛡️ Безопасная игра',
     shareLink: 'Скопировать ссылку',
     muteToggle: 'Звук',
     linkCopied: '✓ Ссылка скопирована',
@@ -1576,7 +1533,6 @@ const I18N = {
     reset: 'Reset',
     solverHints: 'Solver hints',
     gameMode: '🎮 Play mode',
-    strategySafe: '🛡️ Safe play',
     shareLink: 'Copy link',
     muteToggle: 'Sound',
     linkCopied: '✓ Link copied',
@@ -1704,7 +1660,6 @@ const state = {
   picker: null,
   showHints: true,
   gameMode: false,
-  safeMode: false,
   muted: false,
   truth: null,
   probs: {},
@@ -2108,18 +2063,6 @@ function setupActions() {
     syncURL();
   });
 
-  const strategyToggle = document.getElementById('strategy-toggle');
-  strategyToggle.addEventListener('click', () => {
-    state.safeMode = !state.safeMode;
-    strategyToggle.classList.toggle('on', state.safeMode);
-    try { localStorage.setItem('thrillDiggerSafeMode', state.safeMode ? '1' : '0'); } catch {}
-    recomputeAndRender();
-  });
-  try {
-    state.safeMode = localStorage.getItem('thrillDiggerSafeMode') === '1';
-    strategyToggle.classList.toggle('on', state.safeMode);
-  } catch {}
-
   document.getElementById('share-btn').addEventListener('click', shareLink);
 
   document.getElementById('victory-close').addEventListener('click', () => {
@@ -2308,17 +2251,7 @@ function setCell(r, c, val) {
     saveCurrentGame();
   };
 
-  if (state.safeMode) {
-    document.body.classList.add('computing');
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        finish();
-        document.body.classList.remove('computing');
-      }, 0);
-    });
-  } else {
-    finish();
-  }
+  finish();
 }
 
 function computeScore() {
@@ -2530,48 +2463,46 @@ function triggerVictory() {
   renderBoard();
 }
 
-// Strategy: global min pHaz, no spatial bias.
-// Studholme's Step 7 corner-preference assumes Minesweeper cascade (zero-cell auto-reveal),
-// which Thrill Digger lacks. Empirical audit (10000 paired games) confirms global min
-// outperforms Studholme by Δ = +11.16 ± 1.09 (95% CI [9.02, 13.31]) per game.
-// Refs:
-//   Studholme — https://www.cs.toronto.edu/~cvs/minesweeper/minesweeper.pdf
-const SUGGEST_CEILING = 0.20;
-const HIGHLIGHT_TOLERANCE = 0.03;
-
-function entropyScore(r, c, cfg) {
-  let expH = 0, k = 0;
-  for (const [nr, nc] of getNeighbors(r, c, cfg)) {
-    if (state.board[nr][nc] === null) {
-      const np = state.probs[`${nr},${nc}`];
-      if (np) { expH += np.pHaz; k++; }
-    }
-  }
-  if (k === 0) return 0;
-  const ratio = expH / k;
-  return 1 - Math.abs(ratio - 0.5) * 2;
-}
-
-function predictedColor(r, c, cfg) {
-  let exp = 0;
+// Expected reward of revealing (r,c) via Poisson-binomial DP over neighbor pHaz.
+// Sums P(k hazards) × value(color for k) over k=0..n.
+function vColorEV(r, c, cfg) {
+  const ps = [];
   for (const [nr, nc] of getNeighbors(r, c, cfg)) {
     const v = state.board[nr][nc];
-    if (v === 'bomb' || v === 'rupoor') exp++;
+    if (v === 'bomb' || v === 'rupoor') ps.push(1.0);
     else if (v === null) {
       const np = state.probs[`${nr},${nc}`];
-      if (np) exp += np.pHaz;
-    }
+      ps.push(np ? np.pHaz : 0);
+    } else ps.push(0.0);
   }
-  const k = Math.round(exp);
-  if (k === 0) return 'green';
-  if (k <= 2) return 'blue';
-  if (k <= 4) return 'red';
-  if (k <= 6) return 'silver';
-  return 'gold';
+  const n = ps.length;
+  const Pk = new Array(n + 1).fill(0);
+  Pk[0] = 1;
+  for (const p of ps) {
+    for (let j = n; j > 0; j--) Pk[j] = Pk[j] * (1 - p) + Pk[j - 1] * p;
+    Pk[0] *= (1 - p);
+  }
+  let ev = 0;
+  for (let k = 0; k <= n; k++) {
+    const w = (k === 0) ? RUPEES.green.value
+            : (k <= 2)  ? RUPEES.blue.value
+            : (k <= 4)  ? RUPEES.red.value
+            : (k <= 6)  ? RUPEES.silver.value
+            :             RUPEES.gold.value;
+    ev += Pk[k] * w;
+  }
+  return ev;
 }
+
+const EPS_BAND = 0.03;
 
 function findCandidates() {
   const cfg = DIFFICULTIES[state.difficulty];
+
+  let anyOpened = false;
+  for (let r = 0; r < cfg.rows && !anyOpened; r++)
+    for (let c = 0; c < cfg.cols; c++)
+      if (state.board[r][c] !== null) { anyOpened = true; break; }
 
   const scored = [];
   for (let r = 0; r < cfg.rows; r++) {
@@ -2579,63 +2510,52 @@ function findCandidates() {
       if (state.board[r][c] !== null) continue;
       const p = state.probs[`${r},${c}`];
       if (!p) continue;
-      let unrev = 0, revN = 0;
-      for (const [nr, nc] of getNeighbors(r, c, cfg)) {
-        if (state.board[nr][nc] === null) unrev++;
-        else revN++;
-      }
-      const ent = entropyScore(r, c, cfg);
-      const u = p.pHaz - 0.025 * revN - 0.010 * unrev - 0.05 * ent * unrev;
-      scored.push({ r, c, p, unrev, revN, ent, u });
+      scored.push({ r, c, p, nbrCount: getNeighbors(r, c, cfg).length });
     }
   }
   if (scored.length === 0) return { ranks: new Map(), bestEv: null, bestP: null };
 
-  scored.sort((a, b) => a.u - b.u);
-
-  if (state.safeMode) {
-    const topN = Math.min(4, scored.length);
-    let bestIdx = 0, bestRisk = Infinity;
-    for (let i = 0; i < topN; i++) {
-      const cell = scored[i];
-      if (cell.p.pHaz >= 0.99) continue;
-      const color = predictedColor(cell.r, cell.c, cfg);
-      const savedVal = state.board[cell.r][cell.c];
-      state.board[cell.r][cell.c] = color;
-      let nextMin = 1;
-      try {
-        const np = solve();
-        if (np && np.probs) {
-          for (const k in np.probs) {
-            if (np.probs[k].pHaz < nextMin) nextMin = np.probs[k].pHaz;
-          }
-        }
-      } catch (_) {}
-      state.board[cell.r][cell.c] = savedVal;
-      const combined = cell.p.pHaz + (1 - cell.p.pHaz) * nextMin;
-      if (combined < bestRisk) { bestRisk = combined; bestIdx = i; }
-    }
-    if (bestIdx !== 0) {
-      const [picked] = scored.splice(bestIdx, 1);
-      scored.unshift(picked);
-    }
+  // First move: max-neighbor cell (center bias). Empirically corners lose −12 vs center.
+  if (!anyOpened) {
+    scored.sort((a, b) => b.nbrCount - a.nbrCount);
+    const bestP = scored[0].p;
+    const ranks = new Map();
+    ranks.set(`${scored[0].r},${scored[0].c}`, 1);
+    const score = computeScore();
+    const avgRupee = getAvgRupee();
+    const rupoorLoss = Math.min(score, 10);
+    const bestEv = Math.max(0, 1 - bestP.pHaz) * avgRupee - bestP.pRupoor * rupoorLoss;
+    return { ranks, bestEv, bestP };
   }
 
-  const bestP = scored[0].p;
+  for (const s of scored) s.vCol = vColorEV(s.r, s.c, cfg);
+
+  const safe = scored.filter(s => s.p.pBomb < 1e-6);
+  let pool, chosen;
+  if (safe.length > 0) {
+    safe.sort((a, b) => b.vCol - a.vCol);
+    pool = safe;
+    chosen = safe[0];
+  } else {
+    let minP = Infinity;
+    for (const s of scored) if (s.p.pBomb < minP) minP = s.p.pBomb;
+    pool = scored.filter(s => s.p.pBomb <= minP + EPS_BAND);
+    pool.sort((a, b) => b.vCol - a.vCol);
+    chosen = pool[0];
+  }
 
   const ranks = new Map();
-  const seenU = [];
-  for (const s of scored) {
-    if (s.p.pHaz > 0.50) break;
-    let rank = seenU.findIndex(u => Math.abs(u - s.u) < 0.003) + 1;
-    if (rank === 0) {
-      seenU.push(s.u);
-      rank = seenU.length;
-    }
+  const seen = [];
+  for (const s of pool) {
+    if (s.p.pBomb > 0.50) break;
+    let rank = seen.findIndex(v => Math.abs(v - s.vCol) < 1e-9) + 1;
+    if (rank === 0) { seen.push(s.vCol); rank = seen.length; }
     if (rank > 3) break;
     ranks.set(`${s.r},${s.c}`, rank);
   }
+  ranks.set(`${chosen.r},${chosen.c}`, 1);
 
+  const bestP = chosen.p;
   const score = computeScore();
   const avgRupee = getAvgRupee();
   const rupoorLoss = Math.min(score, 10);
