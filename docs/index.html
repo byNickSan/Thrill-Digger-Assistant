@@ -2579,12 +2579,14 @@ function findCandidates() {
       if (state.board[r][c] !== null) continue;
       const p = state.probs[`${r},${c}`];
       if (!p) continue;
-      let unrev = 0;
-      for (const [nr, nc] of getNeighbors(r, c, cfg))
+      let unrev = 0, revN = 0;
+      for (const [nr, nc] of getNeighbors(r, c, cfg)) {
         if (state.board[nr][nc] === null) unrev++;
+        else revN++;
+      }
       const ent = entropyScore(r, c, cfg);
-      const u = p.pHaz - 0.020 * unrev - 0.05 * ent * unrev;
-      scored.push({ r, c, p, unrev, ent, u });
+      const u = p.pHaz - 0.025 * revN - 0.010 * unrev - 0.05 * ent * unrev;
+      scored.push({ r, c, p, unrev, revN, ent, u });
     }
   }
   if (scored.length === 0) return { ranks: new Map(), bestEv: null, bestP: null };
